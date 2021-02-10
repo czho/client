@@ -679,7 +679,12 @@ internal object HighwayTools : Module(
     }
 
     private fun addPendingCommand(command: Command, player: EntityPlayer, data: String = "") {
-        val commandInfo = "$command > $data"
+        val commandInfo = if (data.isBlank()) {
+            "$command"
+        } else {
+            "$command > $data"
+        }
+
         val commandMessage = "$protocolPrefix ${toBase64(commandInfo)}"
         if (debugLog) MessageSendHelper.sendChatMessage("${player.name} > $commandInfo")
         pendingWhispers.add("/w ${player.name} $commandMessage")
@@ -699,6 +704,14 @@ internal object HighwayTools : Module(
 
     private fun assignJob(player: EntityPlayer) {
 
+    }
+
+    private fun getLaneOffset(pos: BlockPos): BlockPos {
+        return if (skynet) {
+            pos.add(startingDirection.clockwise(7).directionVec.multiply((botSet.size - 1).coerceAtMost(width - 3)))
+        } else {
+            pos
+        }
     }
 
     private fun isCommand(string: String): Boolean {
@@ -731,12 +744,12 @@ internal object HighwayTools : Module(
     private fun SafeClientEvent.doPathing() {
         val nextPos = getNextPos()
 
-        if (player.flooredPosition.distanceTo(nextPos) < width) {
+        if (player.flooredPosition.distanceTo(getLaneOffset(nextPos)) < 2.0) {
             currentBlockPos = nextPos
         }
 
         goal = if (skynet && botSet.isNotEmpty()) {
-            GoalNear(nextPos.add(startingDirection.clockwise(7).directionVec.multiply((botSet.size).coerceAtMost(width - 2))), 0)
+            GoalNear(getLaneOffset(nextPos), 0)
         } else {
             GoalNear(nextPos, 0)
         }
@@ -747,11 +760,11 @@ internal object HighwayTools : Module(
 
         val possiblePos = nextPos.add(startingDirection.directionVec)
 
-        if (!isTaskDoneOrNull(possiblePos, false) ||
-            !isTaskDoneOrNull(possiblePos.up(), false) ||
-            !isTaskDoneOrNull(possiblePos.down(), true)) return nextPos
+        if (!isTaskDoneOrNull(getLaneOffset(possiblePos), false) ||
+            !isTaskDoneOrNull(getLaneOffset(possiblePos).up(), false) ||
+            !isTaskDoneOrNull(getLaneOffset(possiblePos).down(), true)) return nextPos
 
-        if (checkTasks(possiblePos.up())) nextPos = possiblePos
+        if (checkTasks(getLaneOffset(possiblePos.up()))) nextPos = possiblePos
 
         if (currentBlockPos != nextPos) {
             simpleMovingAverageDistance.add(System.currentTimeMillis())
