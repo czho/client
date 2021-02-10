@@ -84,9 +84,9 @@ internal object HighwayTools : Module(
     alias = arrayOf("HT", "HWT"),
     modulePriority = 10
 ) {
-    private val mode by setting("Mode", Mode.HIGHWAY, description = "Choose the structure")
     private val page by setting("Page", Page.BUILD, description = "Switch between the setting pages")
 
+    private const val protocolPrefix = "[HTPv1.0]"
     val ignoreBlocks = linkedSetOf(
         Blocks.STANDING_SIGN,
         Blocks.WALL_SIGN,
@@ -99,6 +99,7 @@ internal object HighwayTools : Module(
     )
 
     // build settings
+    private val mode by setting("Mode", Mode.HIGHWAY, { page == Page.BUILD }, description = "Choose the structure")
     private val clearSpace by setting("Clear Space", true, { page == Page.BUILD && mode == Mode.HIGHWAY }, description = "Clears out the tunnel if necessary")
     private val width by setting("Width", 6, 1..11, 1, { page == Page.BUILD }, description = "Sets the width of blueprint")
     private val height by setting("Height", 4, 1..6, 1, { page == Page.BUILD && clearSpace }, description = "Sets height of blueprint")
@@ -124,19 +125,21 @@ internal object HighwayTools : Module(
     private val emptyDisable by setting("Disable on no tool", false, { page == Page.BEHAVIOR }, description = "Disables module when pickaxes are out")
 
     // skynet
-    private val skynet by setting("Skynet", false, { page == Page.SKYNET }, description = "Makes HighwayBots communicate over HighwayToolsProtocol")
+    private val skynet by setting("Skynet", false, { page == Page.SKYNET }, description = "Makes HighwayBots communicate over $protocolPrefix")
     private val friends by setting("Only Friends", true, { page == Page.SKYNET }, description = "Only communicate with players that were added as friends")
-    private val noChatLog by setting("Hide chat log", false, { page == Page.SKYNET }, description = "Hides the HTProtocol whispers")
+    private var whisperDelay by setting("Whisper Delay", 100, 1..1000, 10, { page == Page.SKYNET }, description = "Sets the delay ticks between whispers")
+    private val noWhispersShown by setting("Hide whispers", false, { page == Page.SKYNET }, description = "Hides HTProtocol whispers")
+    private val debugLog by setting("Debug", true, { page == Page.SKYNET }, description = "Shows HTProtocol debug logs")
 
     // stats
     private val anonymizeStats by setting("Anonymize", false, { page == Page.STATS }, description = "Censors all coordinates in HUD and Chat.")
+    private val resetStats = setting("Reset Stats", false, { page == Page.STATS }, description = "Resets the stats")
     private val simpleMovingAverageRange by setting("Moving Average", 60f, 5f..600f, 5f, { page == Page.STATS }, description = "Sets the timeframe of the average in seconds")
     private val showPerformance by setting("Show Performance", true, { page == Page.STATS }, description = "Toggles the Performance section in HUD")
     private val showEnvironment by setting("Show Environment", true, { page == Page.STATS }, description = "Toggles the Environment section in HUD")
     private val showTask by setting("Show Task", true, { page == Page.STATS }, description = "Toggles the Task section in HUD")
     private val showEstimations by setting("Show Estimations", true, { page == Page.STATS }, description = "Toggles the Estimations section in HUD")
     private val showSkynet by setting("Show Skynet", true, { page == Page.STATS && skynet }, description = "Toggles Skynet section in HUD")
-    private val resetStats = setting("Reset Stats", false, { page == Page.STATS }, description = "Resets the stats")
 
     // config
     private val fakeSounds by setting("Fake Sounds", true, { page == Page.CONFIG }, description = "Adds artificial sounds to the actions")
@@ -164,6 +167,10 @@ internal object HighwayTools : Module(
 
     private enum class DebugMessages {
         OFF, IMPORTANT, ALL
+    }
+
+    private enum class Command {
+        HANDSHAKE, ACKNOWLEDGE, ASSIGN_RANK, ASSIGN_JOB, ASSIGN_LANE, UNLOAD
     }
 
     private enum class Job {
@@ -200,10 +207,12 @@ internal object HighwayTools : Module(
     var goal: GoalNear? = null; private set
 
     // Skynet
-    private const val htpVersion = "1.0"
-    private val botSet = LinkedHashSet<Quad<EntityPlayer, Rank, Job, String>>()
+    private val botSet = LinkedHashSet<Quad<EntityPlayer, Rank, Job, Int>>()
     private var rank = Rank.NONE
     private var job = Job.NONE
+    private var lane = 0
+    private val whisperTimer = TickTimer(TimeUnit.TICKS)
+    private val pendingWhispers: Queue<String> = LinkedList()
 
     // Tasks
     private val pendingTasks = LinkedHashMap<BlockPos, BlockTask>()
@@ -388,7 +397,7 @@ internal object HighwayTools : Module(
                     }
                 }
             }
-//            if (noChatLog && isCommand(command)) event.isCanceled = true
+            if (noWhispersShown && isCommand(args[2])) event.isCanceled = true
         }
 
         safeListener<TickEvent.ClientTickEvent> { event ->
@@ -396,6 +405,7 @@ internal object HighwayTools : Module(
 
             updateRenderer()
             updateFood()
+            if (skynet) skynetHandler()
 
             if (!rubberbandTimer.tick(rubberbandTimeout.toLong(), false) ||
                 AutoObsidian.isActive() ||
@@ -417,8 +427,6 @@ internal object HighwayTools : Module(
             runTasks()
 
             doRotation()
-
-            if (skynet) skynetHandler()
         }
     }
 
@@ -635,6 +643,10 @@ internal object HighwayTools : Module(
     }
 
     private fun SafeClientEvent.skynetHandler() {
+        if (whisperTimer.tick(whisperDelay * 1L) && pendingWhispers.isNotEmpty()) {
+            sendServerMessage(pendingWhispers.poll())
+        }
+
         val loadedPlayerSet = LinkedHashSet(world.playerEntities)
         for (entityPlayer in loadedPlayerSet) {
             if (entityPlayer.isFakeOrSelf) continue // Self / Freecam / FakePlayer check
@@ -645,20 +657,20 @@ internal object HighwayTools : Module(
 //                if (player == entityPlayer) isKnown = true
 //            }
 
-            if (botSet.add(Quad(entityPlayer, Rank.SLAVE, Job.PAVER, "S01")) && isEnabled) {
+            if (botSet.add(Quad(entityPlayer, Rank.SLAVE, Job.PAVER, lane)) && isEnabled) {
                 handshake(entityPlayer)
             }
         }
 
         val toRemove = linkedSetOf<EntityPlayer>()
-        for ((player, rank, job, handshake) in botSet) {
+        for ((player, _, _, _) in botSet) {
             if (!loadedPlayerSet.contains(player)) {
                 toRemove.add(player)
                 if (isEnabled) unload(player)
             }
         }
 
-        val toRemoveAgain = LinkedHashSet<Quad<EntityPlayer, Rank, Job, String>>()
+        val toRemoveAgain = LinkedHashSet<Quad<EntityPlayer, Rank, Job, Int>>()
         botSet.forEach {
             if (toRemove.contains(it.first)) toRemoveAgain.add(it)
         }
@@ -666,15 +678,19 @@ internal object HighwayTools : Module(
         botSet.removeAll(toRemoveAgain)
     }
 
-    private fun protocolPrefix(player: EntityPlayer): String {
-        return "[HTPv$htpVersion]"
+    private fun addPendingCommand(command: Command, player: EntityPlayer, data: String = "") {
+        val commandInfo = "$command > $data"
+        val commandMessage = "$protocolPrefix ${toBase64(commandInfo)}"
+        if (debugLog) MessageSendHelper.sendChatMessage("${player.name} > $commandInfo")
+        pendingWhispers.add("/w ${player.name} $commandMessage")
     }
 
     private fun handshake(player: EntityPlayer) {
-        val handshakeInfo = "$rank / $job / ${botSet.size}"
-        val handshakeMessage = "${protocolPrefix(player)} Handshake: ${toBase64(handshakeInfo)}"
-        MessageSendHelper.sendChatMessage(handshakeInfo)
-        sendServerMessage("/w ${player.name} $handshakeMessage")
+        addPendingCommand(Command.HANDSHAKE, player, "$rank $job ${botSet.size} $lane")
+    }
+
+    private fun unload(player: EntityPlayer) {
+        addPendingCommand(Command.UNLOAD, player)
     }
 
     private fun assignRank(player: EntityPlayer) {
@@ -685,40 +701,51 @@ internal object HighwayTools : Module(
 
     }
 
-    private fun unload(player: EntityPlayer) {
-        val unloadInfo = "$rank / $job / ${botSet.size}"
-        val unloadMessage = "${protocolPrefix(player)} Left: ${toBase64(unloadInfo)}"
-        MessageSendHelper.sendChatMessage(unloadInfo)
-        sendServerMessage("/w ${player.name} $unloadMessage")
-    }
-
-    private fun parseCommand(string: String): String {
-        val args = string.split(" ")
-        return string.substring(0, 1)
-    }
-
     private fun isCommand(string: String): Boolean {
-        return string.startsWith("[HTPv")
+        return string.startsWith(protocolPrefix)
+    }
+
+    private fun handleCommand(string: String) {
+        val decoded = fromBase64(string)
+        val command = Command.ACKNOWLEDGE
+        val data = ""
+
+        when (command) {
+            Command.ACKNOWLEDGE -> {
+
+            }
+            else -> {
+
+            }
+        }
     }
 
     private fun toBase64(string: String): String {
         return Base64.getEncoder().encodeToString(toByteArray(string))
     }
 
+    private fun fromBase64(string: String): String {
+        return String(Base64.getDecoder().decode(string))
+    }
+
     private fun SafeClientEvent.doPathing() {
         val nextPos = getNextPos()
 
-        if (player.flooredPosition.distanceTo(nextPos) < 2.0) {
+        if (player.flooredPosition.distanceTo(nextPos) < width) {
             currentBlockPos = nextPos
         }
 
-        goal = GoalNear(nextPos, 0)
+        goal = if (skynet && botSet.isNotEmpty()) {
+            GoalNear(nextPos.add(startingDirection.clockwise(7).directionVec.multiply((botSet.size).coerceAtMost(width - 2))), 0)
+        } else {
+            GoalNear(nextPos, 0)
+        }
     }
 
     private fun SafeClientEvent.getNextPos(): BlockPos {
         var nextPos = currentBlockPos
 
-        val possiblePos = currentBlockPos.add(startingDirection.directionVec)
+        val possiblePos = nextPos.add(startingDirection.directionVec)
 
         if (!isTaskDoneOrNull(possiblePos, false) ||
             !isTaskDoneOrNull(possiblePos.up(), false) ||
@@ -798,7 +825,7 @@ internal object HighwayTools : Module(
     private fun SafeClientEvent.sortTasks() {
         val eyePos = mc.player.getPositionEyes(1.0f)
 
-        if (skynet) {
+        if (botSet.isNotEmpty()) {
             for (task in pendingTasks.values) task.shuffle()
             sortedTasks = pendingTasks.values.sortedWith(
                 compareBy<BlockTask> {
@@ -1521,10 +1548,18 @@ internal object HighwayTools : Module(
     }
 
     private fun gatherSkynet(displayText: TextComponent) {
-        displayText.addLine("Skynet", primaryColor)
-        displayText.add("    Bots:", primaryColor)
-        for (bot in botSet) {
-            displayText.addLine("Name: ${bot.first.name} Rank: ${bot.second} Job: ${bot.third} Data: ${bot.fourth}", secondaryColor)
+        if (botSet.isEmpty()) {
+            displayText.addLine("Skynet inactive.", primaryColor)
+        } else {
+            displayText.addLine("Skynet", primaryColor)
+            displayText.add("    Rank:", primaryColor)
+            displayText.addLine("$rank", secondaryColor)
+            displayText.add("    Job:", primaryColor)
+            displayText.addLine("$job", secondaryColor)
+            displayText.addLine("    Bots:", primaryColor)
+            for (bot in botSet) {
+                displayText.addLine("        Name: ${bot.first.name} Rank: ${bot.second} Job: ${bot.third} Data: ${bot.fourth}", secondaryColor)
+            }
         }
     }
 
