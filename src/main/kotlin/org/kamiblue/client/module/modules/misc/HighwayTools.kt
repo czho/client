@@ -1,12 +1,14 @@
 package org.kamiblue.client.module.modules.misc
 
 import baritone.api.pathing.goals.GoalNear
+import com.sun.jna.Native.toByteArray
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import net.minecraft.block.Block
 import net.minecraft.block.BlockLiquid
 import net.minecraft.client.audio.PositionedSoundRecord
 import net.minecraft.enchantment.EnchantmentHelper
+import net.minecraft.entity.player.EntityPlayer
 import net.minecraft.init.Blocks
 import net.minecraft.init.Enchantments
 import net.minecraft.init.Items
@@ -26,25 +28,24 @@ import net.minecraft.util.SoundCategory
 import net.minecraft.util.math.AxisAlignedBB
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Vec3d
+import net.minecraftforge.client.event.ClientChatReceivedEvent
 import net.minecraftforge.fml.common.gameevent.TickEvent
 import org.kamiblue.client.event.SafeClientEvent
 import org.kamiblue.client.event.events.PacketEvent
 import org.kamiblue.client.event.events.RenderWorldEvent
+import org.kamiblue.client.manager.managers.FriendManager
 import org.kamiblue.client.manager.managers.PlayerPacketManager
 import org.kamiblue.client.module.Category
 import org.kamiblue.client.module.Module
 import org.kamiblue.client.module.modules.client.Hud.primaryColor
 import org.kamiblue.client.module.modules.client.Hud.secondaryColor
 import org.kamiblue.client.module.modules.movement.AntiHunger
-import org.kamiblue.client.module.modules.movement.Velocity
 import org.kamiblue.client.module.modules.player.AutoEat
 import org.kamiblue.client.module.modules.player.InventoryManager
 import org.kamiblue.client.process.HighwayToolsProcess
-import org.kamiblue.client.util.BaritoneUtils
+import org.kamiblue.client.util.*
 import org.kamiblue.client.util.EntityUtils.flooredPosition
-import org.kamiblue.client.util.TickTimer
-import org.kamiblue.client.util.TimeUnit
-import org.kamiblue.client.util.WorldUtils
+import org.kamiblue.client.util.EntityUtils.isFakeOrSelf
 import org.kamiblue.client.util.WorldUtils.blackList
 import org.kamiblue.client.util.WorldUtils.getBetterNeighbour
 import org.kamiblue.client.util.WorldUtils.getMiningSide
@@ -63,6 +64,7 @@ import org.kamiblue.client.util.math.VectorUtils.multiply
 import org.kamiblue.client.util.math.VectorUtils.toVec3dCenter
 import org.kamiblue.client.util.math.isInSight
 import org.kamiblue.client.util.text.MessageSendHelper
+import org.kamiblue.client.util.text.MessageSendHelper.sendServerMessage
 import org.kamiblue.client.util.threads.*
 import org.kamiblue.commons.extension.ceilToInt
 import org.kamiblue.commons.extension.floorToInt
@@ -113,7 +115,6 @@ internal object HighwayTools : Module(
     private val illegalPlacements by setting("Illegal Placements", false, { page == Page.BEHAVIOR }, description = "Do not use on 2b2t. Tries to interact with invisible surfaces")
     private val bridging by setting("Bridging", true, { page == Page.BEHAVIOR }, description = "Tries to bridge / scaffold when stuck placing")
     private var placementSearch by setting("Place Deep Search", 1, 1..20, 1, { page == Page.BEHAVIOR }, description = "Attempts to find a support block for placing against")
-    private val multiBuilding by setting("Shuffle Tasks", false, { page == Page.BEHAVIOR }, description = "Only activate when working with several players")
     private val maxBreaks by setting("Multi Break", 3, 1..8, 1, { page == Page.BEHAVIOR }, description = "Breaks multiple instant breaking blocks per tick in view")
     private val toggleInventoryManager by setting("Toggle InvManager", false, { page == Page.BEHAVIOR }, description = "Activates InventoryManager on enable")
     private val toggleAutoObsidian by setting("Toggle AutoObsidian", true, { page == Page.BEHAVIOR }, description = "Activates AutoObsidian on enable")
@@ -122,6 +123,11 @@ internal object HighwayTools : Module(
     private val maxReach by setting("Max Reach", 4.9f, 1.0f..6.0f, 0.1f, { page == Page.BEHAVIOR }, description = "Sets the range of the blueprint. Decrease when tasks fail!")
     private val emptyDisable by setting("Disable on no tool", false, { page == Page.BEHAVIOR }, description = "Disables module when pickaxes are out")
 
+    // skynet
+    private val skynet by setting("Skynet", false, { page == Page.SKYNET }, description = "Makes HighwayBots communicate over HighwayToolsProtocol")
+    private val friends by setting("Only Friends", true, { page == Page.SKYNET }, description = "Only communicate with players that were added as friends")
+    private val noChatLog by setting("Hide chat log", false, { page == Page.SKYNET }, description = "Hides the HTProtocol whispers")
+
     // stats
     private val anonymizeStats by setting("Anonymize", false, { page == Page.STATS }, description = "Censors all coordinates in HUD and Chat.")
     private val simpleMovingAverageRange by setting("Moving Average", 60f, 5f..600f, 5f, { page == Page.STATS }, description = "Sets the timeframe of the average in seconds")
@@ -129,6 +135,7 @@ internal object HighwayTools : Module(
     private val showEnvironment by setting("Show Environment", true, { page == Page.STATS }, description = "Toggles the Environment section in HUD")
     private val showTask by setting("Show Task", true, { page == Page.STATS }, description = "Toggles the Task section in HUD")
     private val showEstimations by setting("Show Estimations", true, { page == Page.STATS }, description = "Toggles the Estimations section in HUD")
+    private val showSkynet by setting("Show Skynet", true, { page == Page.STATS && skynet }, description = "Toggles Skynet section in HUD")
     private val resetStats = setting("Reset Stats", false, { page == Page.STATS }, description = "Resets the stats")
 
     // config
@@ -147,7 +154,7 @@ internal object HighwayTools : Module(
     }
 
     private enum class Page {
-        BUILD, BEHAVIOR, STATS, CONFIG
+        BUILD, BEHAVIOR, SKYNET, STATS, CONFIG
     }
 
     @Suppress("UNUSED")
@@ -157,6 +164,14 @@ internal object HighwayTools : Module(
 
     private enum class DebugMessages {
         OFF, IMPORTANT, ALL
+    }
+
+    private enum class Job {
+        NONE, DIGGER, PAVER, SCAFFOLDER
+    }
+
+    private enum class Rank {
+        NONE, MASTER, SLAVE
     }
 
     // internal settings
@@ -183,6 +198,12 @@ internal object HighwayTools : Module(
 
     // Pathing
     var goal: GoalNear? = null; private set
+
+    // Skynet
+    private const val htpVersion = "1.0"
+    private val botSet = LinkedHashSet<Quad<EntityPlayer, Rank, Job, String>>()
+    private var rank = Rank.NONE
+    private var job = Job.NONE
 
     // Tasks
     private val pendingTasks = LinkedHashMap<BlockPos, BlockTask>()
@@ -299,10 +320,6 @@ internal object HighwayTools : Module(
                 MessageSendHelper.sendRawChatMessage("    §9> §cAntiHunger does slow down block interactions.")
             }
 
-            if (multiBuilding && Velocity.isDisabled) {
-                MessageSendHelper.sendRawChatMessage("    §9> §cMake sure to enable Velocity to not get pushed from your mates.")
-            }
-
         }
     }
 
@@ -361,6 +378,19 @@ internal object HighwayTools : Module(
             renderer.render(false)
         }
 
+        safeListener<ClientChatReceivedEvent> { event ->
+            val raw = event.message.unformattedText
+            val args = raw.split(" ")
+            if (args.size > 2) {
+                if (args[1] == "whispers:") {
+                    if (isCommand(args[2]) && args[0] != player.name) {
+                        MessageSendHelper.sendChatMessage("$args is a command!")
+                    }
+                }
+            }
+//            if (noChatLog && isCommand(command)) event.isCanceled = true
+        }
+
         safeListener<TickEvent.ClientTickEvent> { event ->
             if (event.phase != TickEvent.Phase.START) return@safeListener
 
@@ -387,6 +417,8 @@ internal object HighwayTools : Module(
             runTasks()
 
             doRotation()
+
+            if (skynet) skynetHandler()
         }
     }
 
@@ -602,6 +634,77 @@ internal object HighwayTools : Module(
         doneTasks[blockPos] = (BlockTask(blockPos, TaskState.DONE, material))
     }
 
+    private fun SafeClientEvent.skynetHandler() {
+        val loadedPlayerSet = LinkedHashSet(world.playerEntities)
+        for (entityPlayer in loadedPlayerSet) {
+            if (entityPlayer.isFakeOrSelf) continue // Self / Freecam / FakePlayer check
+            if (!friends && FriendManager.isFriend(entityPlayer.name)) continue // Friend check
+
+//            var isKnown = false
+//            for ((player, rank, job, handshake) in botSet) {
+//                if (player == entityPlayer) isKnown = true
+//            }
+
+            if (botSet.add(Quad(entityPlayer, Rank.SLAVE, Job.PAVER, "S01")) && isEnabled) {
+                handshake(entityPlayer)
+            }
+        }
+
+        val toRemove = linkedSetOf<EntityPlayer>()
+        for ((player, rank, job, handshake) in botSet) {
+            if (!loadedPlayerSet.contains(player)) {
+                toRemove.add(player)
+                if (isEnabled) unload(player)
+            }
+        }
+
+        val toRemoveAgain = LinkedHashSet<Quad<EntityPlayer, Rank, Job, String>>()
+        botSet.forEach {
+            if (toRemove.contains(it.first)) toRemoveAgain.add(it)
+        }
+
+        botSet.removeAll(toRemoveAgain)
+    }
+
+    private fun protocolPrefix(player: EntityPlayer): String {
+        return "[HTPv$htpVersion]"
+    }
+
+    private fun handshake(player: EntityPlayer) {
+        val handshakeInfo = "$rank / $job / ${botSet.size}"
+        val handshakeMessage = "${protocolPrefix(player)} Handshake: ${toBase64(handshakeInfo)}"
+        MessageSendHelper.sendChatMessage(handshakeInfo)
+        sendServerMessage("/w ${player.name} $handshakeMessage")
+    }
+
+    private fun assignRank(player: EntityPlayer) {
+
+    }
+
+    private fun assignJob(player: EntityPlayer) {
+
+    }
+
+    private fun unload(player: EntityPlayer) {
+        val unloadInfo = "$rank / $job / ${botSet.size}"
+        val unloadMessage = "${protocolPrefix(player)} Left: ${toBase64(unloadInfo)}"
+        MessageSendHelper.sendChatMessage(unloadInfo)
+        sendServerMessage("/w ${player.name} $unloadMessage")
+    }
+
+    private fun parseCommand(string: String): String {
+        val args = string.split(" ")
+        return string.substring(0, 1)
+    }
+
+    private fun isCommand(string: String): Boolean {
+        return string.startsWith("[HTPv")
+    }
+
+    private fun toBase64(string: String): String {
+        return Base64.getEncoder().encodeToString(toByteArray(string))
+    }
+
     private fun SafeClientEvent.doPathing() {
         val nextPos = getNextPos()
 
@@ -695,7 +798,7 @@ internal object HighwayTools : Module(
     private fun SafeClientEvent.sortTasks() {
         val eyePos = mc.player.getPositionEyes(1.0f)
 
-        if (multiBuilding) {
+        if (skynet) {
             for (task in pendingTasks.values) task.shuffle()
             sortedTasks = pendingTasks.values.sortedWith(
                 compareBy<BlockTask> {
@@ -1296,6 +1399,8 @@ internal object HighwayTools : Module(
 
         if (showEstimations) gatherEstimations(displayText, runtimeSec, distanceDone)
 
+        if (showSkynet && skynet) gatherSkynet(displayText)
+
 //        displayText.addLine("by Constructor#9948 aka Avanatiker", primaryColor)
 
         if (printDebug) {
@@ -1412,6 +1517,14 @@ internal object HighwayTools : Module(
                 displayText.add("    ETA:", primaryColor)
                 displayText.addLine("$hoursLeft:$minutesLeft:$secondsLeft", secondaryColor)
             }
+        }
+    }
+
+    private fun gatherSkynet(displayText: TextComponent) {
+        displayText.addLine("Skynet", primaryColor)
+        displayText.add("    Bots:", primaryColor)
+        for (bot in botSet) {
+            displayText.addLine("Name: ${bot.first.name} Rank: ${bot.second} Job: ${bot.third} Data: ${bot.fourth}", secondaryColor)
         }
     }
 
