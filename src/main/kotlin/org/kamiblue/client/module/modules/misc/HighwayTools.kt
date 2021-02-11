@@ -833,41 +833,47 @@ internal object HighwayTools : Module(
     private fun SafeClientEvent.sortTasks() {
         val eyePos = mc.player.getPositionEyes(1.0f)
 
-        if (botSet.isNotEmpty()) {
-            for (task in pendingTasks.values) task.shuffle()
-            sortedTasks = pendingTasks.values.sortedWith(
-                compareBy<BlockTask> {
-                    it.taskState.ordinal
-                }.thenBy {
-                    it.stuckTicks / 5
-                }.thenBy {
-                    it.shuffle
-                }
-            )
-        } else {
-            sortedTasks = pendingTasks.values.sortedWith(
-                compareBy<BlockTask> {
-                    it.taskState.ordinal
-                }.thenBy {
-                    it.stuckTicks / 5
-                }.thenBy {
-                    when (it.taskState) {
-                        TaskState.PLACE, TaskState.LIQUID_SOURCE, TaskState.LIQUID_FLOW -> {
-                            getBetterNeighbour(it.blockPos, placementSearch, maxReach, true).size
+        when (job) {
+            Job.NONE -> {
+                sortedTasks = pendingTasks.values.sortedWith(
+                    compareBy<BlockTask> {
+                        it.taskState.ordinal
+                    }.thenBy {
+                        it.stuckTicks / 5
+                    }.thenBy {
+                        when (it.taskState) {
+                            TaskState.PLACE, TaskState.LIQUID_SOURCE, TaskState.LIQUID_FLOW -> {
+                                getBetterNeighbour(it.blockPos, placementSearch, maxReach, true).size
+                            }
+                            TaskState.BREAK -> { // ToDo: Check for most block interceptions when kick issue solved
+                                0
+                            }
+                            else -> 0
                         }
-                        TaskState.BREAK -> { // ToDo: Check for most block interceptions when kick issue solved
-                            0
-                        }
-                        else -> 0
+                    }.thenBy { // ToDo: We need a function that makes a score out of those 3 parameters
+                        startingBlockPos.distanceTo(it.blockPos).toInt() / 2
+                    }.thenBy {
+                        eyePos.distanceTo(it.blockPos)
+                    }.thenBy {
+                        lastHitVec?.distanceTo(it.blockPos)
                     }
-                }.thenBy { // ToDo: We need a function that makes a score out of those 3 parameters
-                    startingBlockPos.distanceTo(it.blockPos).toInt() / 2
-                }.thenBy {
-                    eyePos.distanceTo(it.blockPos)
-                }.thenBy {
-                    lastHitVec?.distanceTo(it.blockPos)
-                }
-            )
+                )
+            }
+            Job.PAVER -> {
+                pendingTasks.values.forEach { it.shuffle() }
+                sortedTasks = pendingTasks.values.sortedWith(
+                    compareBy<BlockTask> {
+                        it.taskState.ordinal
+                    }.thenBy {
+                        it.stuckTicks / 5
+                    }.thenBy {
+                        it.shuffle
+                    }
+                )
+            }
+            else -> {
+
+            }
         }
     }
 
