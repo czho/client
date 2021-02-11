@@ -39,6 +39,7 @@ import org.kamiblue.client.module.Category
 import org.kamiblue.client.module.Module
 import org.kamiblue.client.module.modules.client.Hud.primaryColor
 import org.kamiblue.client.module.modules.client.Hud.secondaryColor
+import org.kamiblue.client.module.modules.combat.VisualRange
 import org.kamiblue.client.module.modules.movement.AntiHunger
 import org.kamiblue.client.module.modules.player.AutoEat
 import org.kamiblue.client.module.modules.player.InventoryManager
@@ -49,6 +50,7 @@ import org.kamiblue.client.util.EntityUtils.isFakeOrSelf
 import org.kamiblue.client.util.WorldUtils.blackList
 import org.kamiblue.client.util.WorldUtils.getBetterNeighbour
 import org.kamiblue.client.util.WorldUtils.getMiningSide
+import org.kamiblue.client.util.WorldUtils.getVisibleSides
 import org.kamiblue.client.util.WorldUtils.isLiquid
 import org.kamiblue.client.util.WorldUtils.isPlaceable
 import org.kamiblue.client.util.WorldUtils.shulkerList
@@ -115,7 +117,7 @@ internal object HighwayTools : Module(
     private var breakDelay by setting("Break Delay", 1, 1..20, 1, { page == Page.BEHAVIOR }, description = "Sets the delay ticks between break tasks")
     private val illegalPlacements by setting("Illegal Placements", false, { page == Page.BEHAVIOR }, description = "Do not use on 2b2t. Tries to interact with invisible surfaces")
     private val bridging by setting("Bridging", true, { page == Page.BEHAVIOR }, description = "Tries to bridge / scaffold when stuck placing")
-    private var placementSearch by setting("Place Deep Search", 1, 1..20, 1, { page == Page.BEHAVIOR }, description = "Attempts to find a support block for placing against")
+    private val placementSearch by setting("Place Deep Search", 1, 1..20, 1, { page == Page.BEHAVIOR }, description = "Attempts to find a support block for placing against")
     private val maxBreaks by setting("Multi Break", 3, 1..8, 1, { page == Page.BEHAVIOR }, description = "Breaks multiple instant breaking blocks per tick in view")
     private val toggleInventoryManager by setting("Toggle InvManager", false, { page == Page.BEHAVIOR }, description = "Activates InventoryManager on enable")
     private val toggleAutoObsidian by setting("Toggle AutoObsidian", true, { page == Page.BEHAVIOR }, description = "Activates AutoObsidian on enable")
@@ -127,8 +129,10 @@ internal object HighwayTools : Module(
     // skynet
     private val skynet by setting("Skynet", false, { page == Page.SKYNET }, description = "Makes HighwayBots communicate over $protocolPrefix")
     private val friends by setting("Only Friends", true, { page == Page.SKYNET }, description = "Only communicate with players that were added as friends")
-    private var whisperDelay by setting("Whisper Delay", 100, 1..1000, 10, { page == Page.SKYNET }, description = "Sets the delay ticks between whispers")
+    private val whisperDelay by setting("Whisper Delay", 100, 1..1000, 10, { page == Page.SKYNET }, description = "Sets the delay ticks between whispers")
+    private val testLane by setting("Test Lane", 1, -10..10, 1, { page == Page.SKYNET }, description = "Sets the delay ticks between whispers")
     private val noWhispersShown by setting("Hide whispers", false, { page == Page.SKYNET }, description = "Hides HTProtocol whispers")
+    private val suppressWhisper by setting("Suppress whispers", false, { page == Page.SKYNET }, description = "Suppresses whispers for debugging")
     private val debugLog by setting("Debug", true, { page == Page.SKYNET }, description = "Shows HTProtocol debug logs")
 
     // stats
@@ -170,14 +174,14 @@ internal object HighwayTools : Module(
     }
 
     private enum class Command {
-        HANDSHAKE, ACKNOWLEDGE, ASSIGN_RANK, ASSIGN_JOB, ASSIGN_LANE, UNLOAD
+        HANDSHAKE, ASSIGN_STATUS
     }
 
-    private enum class Job {
+    enum class Job {
         NONE, DIGGER, PAVER, SCAFFOLDER
     }
 
-    private enum class Rank {
+    enum class Rank {
         NONE, MASTER, SLAVE
     }
 
@@ -207,12 +211,12 @@ internal object HighwayTools : Module(
     var goal: GoalNear? = null; private set
 
     // Skynet
-    private val botSet = LinkedHashSet<Quad<EntityPlayer, Rank, Job, Int>>()
+    private val botSet = LinkedHashSet<Bot>()
     private var rank = Rank.NONE
     private var job = Job.NONE
     private var lane = 0
     private val whisperTimer = TickTimer(TimeUnit.TICKS)
-    private val pendingWhispers: Queue<String> = LinkedList()
+    private val pendingWhispers: Queue<Pair<String, String>> = LinkedList()
 
     // Tasks
     private val pendingTasks = LinkedHashMap<BlockPos, BlockTask>()
@@ -388,16 +392,13 @@ internal object HighwayTools : Module(
         }
 
         safeListener<ClientChatReceivedEvent> { event ->
-            val raw = event.message.unformattedText
-            val args = raw.split(" ")
+            val args = event.message.unformattedText.split(" ")
             if (args.size > 2) {
-                if (args[1] == "whispers:") {
-                    if (isCommand(args[2]) && args[0] != player.name) {
-                        MessageSendHelper.sendChatMessage("$args is a command!")
-                    }
+                if (isCommand(args)) {
+                    handleCommand(args[0], args[2])
+                    if (noWhispersShown) event.isCanceled = true
                 }
             }
-            if (noWhispersShown && isCommand(args[2])) event.isCanceled = true
         }
 
         safeListener<TickEvent.ClientTickEvent> { event ->
@@ -644,41 +645,31 @@ internal object HighwayTools : Module(
 
     private fun SafeClientEvent.skynetHandler() {
         if (whisperTimer.tick(whisperDelay * 1L) && pendingWhispers.isNotEmpty()) {
-            sendServerMessage(pendingWhispers.poll())
-        }
-
-        val loadedPlayerSet = LinkedHashSet(world.playerEntities)
-        for (entityPlayer in loadedPlayerSet) {
-            if (entityPlayer.isFakeOrSelf) continue // Self / Freecam / FakePlayer check
-            if (!friends && FriendManager.isFriend(entityPlayer.name)) continue // Friend check
-
-//            var isKnown = false
-//            for ((player, rank, job, handshake) in botSet) {
-//                if (player == entityPlayer) isKnown = true
-//            }
-
-            if (botSet.add(Quad(entityPlayer, Rank.SLAVE, Job.PAVER, lane)) && isEnabled) {
-                handshake(entityPlayer)
+            val pendingCommand = pendingWhispers.poll()
+            botSet.forEach {
+                if (it.name == pendingCommand.second) sendServerMessage(pendingCommand.first)
             }
         }
 
-        val toRemove = linkedSetOf<EntityPlayer>()
-        for ((player, _, _, _) in botSet) {
-            if (!loadedPlayerSet.contains(player)) {
-                toRemove.add(player)
-                if (isEnabled) unload(player)
+        val players = LinkedHashSet(world.playerEntities)
+
+        players.removeIf {
+            it.isFakeOrSelf || (!friends && FriendManager.isFriend(it.name))
+        }
+
+        players.forEach { player ->
+            if (botSet.any { it.player == player }) {
+                botSet.add(Bot(player, player.name, Rank.NONE, Job.NONE, 0))
+                if (isEnabled) handshake(player.name)
             }
         }
 
-        val toRemoveAgain = LinkedHashSet<Quad<EntityPlayer, Rank, Job, Int>>()
-        botSet.forEach {
-            if (toRemove.contains(it.first)) toRemoveAgain.add(it)
+        botSet.removeIf {
+            !players.contains(it.player)
         }
-
-        botSet.removeAll(toRemoveAgain)
     }
 
-    private fun addPendingCommand(command: Command, player: EntityPlayer, data: String = "") {
+    private fun addPendingCommand(command: Command, player: String, data: String = "") {
         val commandInfo = if (data.isBlank()) {
             "$command"
         } else {
@@ -686,49 +677,45 @@ internal object HighwayTools : Module(
         }
 
         val commandMessage = "$protocolPrefix ${toBase64(commandInfo)}"
-        if (debugLog) MessageSendHelper.sendChatMessage("${player.name} > $commandInfo")
-        pendingWhispers.add("/w ${player.name} $commandMessage")
+        if (debugLog) MessageSendHelper.sendChatMessage("$protocolPrefix $player > $commandInfo")
+        if (!suppressWhisper) pendingWhispers.add(Pair("/w $player $commandMessage", player))
     }
 
-    private fun handshake(player: EntityPlayer) {
-        addPendingCommand(Command.HANDSHAKE, player, "$rank $job ${botSet.size} $lane")
+    private fun handshake(player: String) {
+        addPendingCommand(Command.HANDSHAKE, player, "$rank $job $lane ${botSet.size}")
     }
 
-    private fun unload(player: EntityPlayer) {
-        addPendingCommand(Command.UNLOAD, player)
+    private fun assignStatus(player: String, botRank: Rank, botJob: Job, botLane: Int) {
+        addPendingCommand(Command.ASSIGN_STATUS, player, "$botRank $botJob $botLane")
     }
 
-    private fun assignRank(player: EntityPlayer) {
-
+    private fun SafeClientEvent.isCommand(args: List<String>): Boolean {
+        return args[0] != player.name && args[1] == "whispers:" && args[2].startsWith(protocolPrefix)
     }
 
-    private fun assignJob(player: EntityPlayer) {
+    private fun handleCommand(player: String, command: String) {
+        val decoded = fromBase64(command).split(" ")
+        if (debugLog) MessageSendHelper.sendChatMessage("$protocolPrefix $player > ${fromBase64(command)}")
 
-    }
-
-    private fun getLaneOffset(pos: BlockPos): BlockPos {
-        return if (skynet) {
-            pos.add(startingDirection.clockwise(7).directionVec.multiply((botSet.size - 1).coerceAtMost(width - 3)))
-        } else {
-            pos
-        }
-    }
-
-    private fun isCommand(string: String): Boolean {
-        return string.startsWith(protocolPrefix)
-    }
-
-    private fun handleCommand(string: String) {
-        val decoded = fromBase64(string)
-        val command = Command.ACKNOWLEDGE
-        val data = ""
-
-        when (command) {
-            Command.ACKNOWLEDGE -> {
-
+        when (Command.valueOf(decoded[0])) {
+            Command.HANDSHAKE -> {
+                if (player != "Avanatiker" || Rank.valueOf(decoded[1]) != Rank.MASTER) {
+                    var index = 0
+                    botSet.forEach {
+                        if (it.name == player) {
+                            it.rank = Rank.SLAVE
+                            it.job = Job.PAVER
+                            it.lane = index.rem(width - 2)
+                            index = botSet.indexOf(it)
+                        }
+                    }
+                    assignStatus(player, Rank.SLAVE, Job.PAVER, index.rem(width - 2))
+                }
             }
-            else -> {
-
+            Command.ASSIGN_STATUS -> {
+                rank = Rank.valueOf(decoded[1])
+                job = Job.valueOf(decoded[2])
+                lane = decoded[3].toInt()
             }
         }
     }
@@ -739,6 +726,14 @@ internal object HighwayTools : Module(
 
     private fun fromBase64(string: String): String {
         return String(Base64.getDecoder().decode(string))
+    }
+
+    private fun getLaneOffset(pos: BlockPos): BlockPos {
+        return if (skynet) {
+            pos.add(startingDirection.clockwise(7).directionVec.multiply(testLane))
+        } else {
+            pos
+        }
     }
 
     private fun SafeClientEvent.doPathing() {
@@ -1309,12 +1304,15 @@ internal object HighwayTools : Module(
     private fun SafeClientEvent.mineBlock(blockTask: BlockTask) {
 
         /* For fire, we just need to mine the top of the block below the fire */
-        /* ToDo: This will not work if the top of the block which the fire is on is not visible */
         if (blockTask.block == Blocks.FIRE) {
             val blockBelowFire = blockTask.blockPos.down()
-            playerController.clickBlock(blockBelowFire, EnumFacing.UP)
-            player.swingArm(EnumHand.MAIN_HAND)
-            blockTask.updateState(TaskState.BREAKING)
+            if (getVisibleSides(blockBelowFire).contains(EnumFacing.UP)) {
+                playerController.clickBlock(blockBelowFire, EnumFacing.UP)
+                player.swingArm(EnumHand.MAIN_HAND)
+                blockTask.updateState(TaskState.BREAKING)
+            } else {
+                blockTask.updateState(TaskState.LIQUID_FLOW)
+            }
             return
         }
 
@@ -1569,9 +1567,11 @@ internal object HighwayTools : Module(
             displayText.addLine("$rank", secondaryColor)
             displayText.add("    Job:", primaryColor)
             displayText.addLine("$job", secondaryColor)
+            displayText.add("    Lane:", primaryColor)
+            displayText.addLine("$lane", secondaryColor)
             displayText.addLine("    Bots:", primaryColor)
             for (bot in botSet) {
-                displayText.addLine("        Name: ${bot.first.name} Rank: ${bot.second} Job: ${bot.third} Data: ${bot.fourth}", secondaryColor)
+                displayText.addLine("        Name: ${bot.name} Rank: ${bot.rank} Job: ${bot.job} Lane: ${bot.lane}", secondaryColor)
             }
         }
     }
@@ -1595,6 +1595,14 @@ internal object HighwayTools : Module(
     private fun addTaskComponentList(displayText: TextComponent, tasks: Collection<BlockTask>) {
         for (blockTask in tasks) displayText.addLine("    ${blockTask.block.localizedName}@(${blockTask.blockPos.asString()}) State: ${blockTask.taskState} Timings: (Threshold: ${blockTask.taskState.stuckThreshold} Timeout: ${blockTask.taskState.stuckTimeout}) Priority: ${blockTask.taskState.ordinal} Stuck: ${blockTask.stuckTicks}")
     }
+
+    class Bot(
+        val player: EntityPlayer,
+        val name: String,
+        var rank: Rank,
+        var job: Job,
+        var lane: Int
+    )
 
     class BlockTask(
         val blockPos: BlockPos,
