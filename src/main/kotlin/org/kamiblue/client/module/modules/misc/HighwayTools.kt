@@ -395,7 +395,7 @@ internal object HighwayTools : Module(
             val args = event.message.unformattedText.split(" ")
             if (args.size > 2) {
                 if (isCommand(args)) {
-                    handleCommand(args[0], args[2])
+                    handleCommand(args[0], args[3])
                     if (noWhispersShown) event.isCanceled = true
                 }
             }
