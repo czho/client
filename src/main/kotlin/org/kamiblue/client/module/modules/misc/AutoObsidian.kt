@@ -15,7 +15,6 @@ import net.minecraft.init.Blocks
 import net.minecraft.init.Enchantments
 import net.minecraft.init.Items
 import net.minecraft.init.SoundEvents
-import net.minecraft.inventory.ClickType
 import net.minecraft.item.ItemShulkerBox
 import net.minecraft.network.play.client.CPacketEntityAction
 import net.minecraft.network.play.client.CPacketPlayerDigging
@@ -45,6 +44,9 @@ import org.kamiblue.client.util.WorldUtils.isPlaceable
 import org.kamiblue.client.util.WorldUtils.placeBlock
 import org.kamiblue.client.util.color.ColorHolder
 import org.kamiblue.client.util.graphics.ESPRenderer
+import org.kamiblue.client.util.inventory.*
+import org.kamiblue.client.util.inventory.operation.*
+import org.kamiblue.client.util.inventory.slot.*
 import org.kamiblue.client.util.items.*
 import org.kamiblue.client.util.math.RotationUtils.getRotationTo
 import org.kamiblue.client.util.math.VectorUtils
@@ -511,7 +513,9 @@ internal object AutoObsidian : Module(
             val slot = container.getSlots(0..27).firstBlock(Blocks.ENDER_CHEST)
 
             if (slot != null) {
-                clickSlot(container.windowId, slot, 0, ClickType.QUICK_MOVE)
+                inventoryTaskNow {
+                    quickMove(container.windowId, slot)
+                }
                 player.closeScreen()
             } else if (shulkerOpenTimer.tick(100, false)) { // Wait for maximum of 5 seconds
                 if (leaveEmptyShulkers && container.inventory.subList(0, 27).all { it.isEmpty }) {

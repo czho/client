@@ -1,18 +1,22 @@
 package org.kamiblue.client.module.modules.combat
 
-import net.minecraft.client.gui.inventory.GuiContainer
 import net.minecraft.init.Items
-import net.minecraft.inventory.ClickType
+import net.minecraft.inventory.EntityEquipmentSlot
+import net.minecraft.inventory.Slot
 import net.minecraft.item.ItemArmor
 import net.minecraft.item.ItemStack
 import net.minecraftforge.fml.common.gameevent.TickEvent
-import org.kamiblue.client.event.SafeClientEvent
-import org.kamiblue.client.manager.managers.PlayerInventoryManager
-import org.kamiblue.client.manager.managers.PlayerInventoryManager.addInventoryTask
 import org.kamiblue.client.module.Category
 import org.kamiblue.client.module.Module
 import org.kamiblue.client.util.*
-import org.kamiblue.client.util.items.removeHoldingItem
+import org.kamiblue.client.util.inventory.InventoryTask
+import org.kamiblue.client.util.inventory.inventoryTask
+import org.kamiblue.client.util.inventory.confirmedOrTrue
+import org.kamiblue.client.util.inventory.operation.pickUp
+import org.kamiblue.client.util.inventory.operation.quickMove
+import org.kamiblue.client.util.inventory.slot.armorSlots
+import org.kamiblue.client.util.inventory.slot.chestSlot
+import org.kamiblue.client.util.inventory.slot.inventorySlots
 import org.kamiblue.client.util.threads.safeListener
 
 internal object AutoArmor : Module(
@@ -21,39 +25,39 @@ internal object AutoArmor : Module(
     description = "Automatically equips armour",
     modulePriority = 500
 ) {
-    private val delay = setting("Delay", 5, 1..10, 1)
+    private val confirmTimeout by setting("Confirm Timeout", 5, 1..20, 1)
+    private val delay by setting("Delay", 2, 1..10, 1)
 
-    private val timer = TickTimer(TimeUnit.TICKS)
-    private var lastTask = TaskState(true)
+    private var lastTask: InventoryTask? = null
 
     init {
         safeListener<TickEvent.ClientTickEvent> {
-            if (!timer.tick(delay.value.toLong()) || !lastTask.done) return@safeListener
+            if (!lastTask.confirmedOrTrue) return@safeListener
 
-            if (!player.inventory.itemStack.isEmpty) {
-                if (mc.currentScreen is GuiContainer) timer.reset(150L) // Wait for 3 extra ticks if player is moving item
-                else removeHoldingItem()
-                return@safeListener
-            }
+            val armorSlots = player.armorSlots
+            val chestItem = player.chestSlot.stack.item
+
             // store slots and values of best armor pieces, initialize with currently equipped armor
             // Pair<Slot, Value>
-            val bestArmors = Array(4) { -1 to getArmorValue(player.inventory.armorInventory[it]) }
+            val bestArmors = Array(4) { armorSlots[it] to getArmorValue(armorSlots[it].stack) }
 
             // search inventory for better armor
-            for (slot in 9..44) {
-                val itemStack = player.inventoryContainer.inventory[slot]
+            for (slot in player.inventorySlots) {
+                val itemStack = slot.stack
                 val item = itemStack.item
                 if (item !is ItemArmor) continue
 
-                val armorType = item.armorType.index
-                if (armorType == 2 && player.inventory.armorInventory[2].item == Items.ELYTRA) continue // Skip if item is chestplate and we have elytra equipped
-                val armorValue = getArmorValue(itemStack)
+                val armorType = item.armorType
+                if (armorType == EntityEquipmentSlot.CHEST && chestItem == Items.ELYTRA) continue // Skip if item is chestplate and we have elytra equipped
 
-                if (armorValue > bestArmors[armorType].second) bestArmors[armorType] = slot to armorValue
+                val armorValue = getArmorValue(itemStack)
+                val armorIndex = 3 - armorType.index
+
+                if (armorValue > bestArmors[armorIndex].second) bestArmors[armorIndex] = slot to armorValue
             }
 
             // equip better armor
-            equipArmor(bestArmors)
+            equipArmor(armorSlots, bestArmors)
         }
     }
 
@@ -64,29 +68,38 @@ internal object AutoArmor : Module(
     }
 
     private fun getProtectionModifier(itemStack: ItemStack): Float {
-        for (i in 0 until itemStack.enchantmentTagList.tagCount()) {
-            val id = itemStack.enchantmentTagList.getCompoundTagAt(i).getShort("id").toInt()
-            val level = itemStack.enchantmentTagList.getCompoundTagAt(i).getShort("lvl").toInt()
+        val tagList = itemStack.enchantmentTagList
+        for (i in 0 until tagList.tagCount()) {
+            val compoundTag = tagList.getCompoundTagAt(i)
+
+            val id = compoundTag.getInteger("id")
             if (id != 0) continue
-            return 1f + 0.04f * level
+
+            val level = compoundTag.getInteger("lvl")
+            return 1.0f + 0.04f * level
         }
-        return 1f
+        return 1.0f
     }
 
-    private fun SafeClientEvent.equipArmor(bestArmors: Array<Pair<Int, Float>>) {
+    private fun equipArmor(armorSlots: List<Slot>, bestArmors: Array<Pair<Slot, Float>>) {
         for ((index, pair) in bestArmors.withIndex()) {
-            if (pair.first == -1) continue // Skip if we didn't find a better armor
-            lastTask = if (player.inventoryContainer.inventory[8 - index].isEmpty) {
-                addInventoryTask(
-                    PlayerInventoryManager.ClickInfo(0, pair.first, type = ClickType.QUICK_MOVE) // Move the new one into armor slot
-                )
-            } else {
-                addInventoryTask(
-                    PlayerInventoryManager.ClickInfo(0, 8 - index, type = ClickType.PICKUP), // Pick up the old armor from armor slot
-                    PlayerInventoryManager.ClickInfo(0, pair.first, type = ClickType.QUICK_MOVE), // Move the new one into armor slot
-                    PlayerInventoryManager.ClickInfo(0, pair.first, type = ClickType.PICKUP) // Put the old one into the empty slot
-                )
+            if (pair.first.slotNumber < 9) continue // Skip if we didn't find a better armor in inventory
+
+            val armorSlot = armorSlots[index]
+
+            lastTask = inventoryTask {
+                postDelay(delay, TimeUnit.TICKS)
+                timeout(confirmTimeout, TimeUnit.TICKS)
+
+                if (!armorSlot.hasStack) {
+                    quickMove(pair.first) // Move the new one into armor slot
+                } else {
+                    pickUp(armorSlot)  // Pick up the old armor from armor slot
+                    quickMove(pair.first) // Move the new one into armor slot
+                    pickUp(pair.first) // Put the old one into the empty slot
+                }
             }
+
             break // Don't move more than one at once
         }
     }
