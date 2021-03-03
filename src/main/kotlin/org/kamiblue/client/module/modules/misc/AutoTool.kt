@@ -14,8 +14,8 @@ import org.kamiblue.client.module.Module
 import org.kamiblue.client.util.combat.CombatUtils
 import org.kamiblue.client.util.combat.CombatUtils.equipBestWeapon
 import org.kamiblue.client.util.inventory.operation.swapToSlot
+import org.kamiblue.client.util.inventory.slot.hotbarSlots
 import org.kamiblue.client.util.threads.safeListener
-import org.kamiblue.client.util.items.hotbarSlots
 import org.lwjgl.input.Mouse
 
 internal object AutoTool : Module(

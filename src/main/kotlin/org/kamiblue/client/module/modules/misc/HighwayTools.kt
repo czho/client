@@ -59,6 +59,13 @@ import org.kamiblue.client.util.WorldUtils.shulkerList
 import org.kamiblue.client.util.color.ColorHolder
 import org.kamiblue.client.util.graphics.ESPRenderer
 import org.kamiblue.client.util.graphics.font.TextComponent
+import org.kamiblue.client.util.inventory.InventoryTask
+import org.kamiblue.client.util.inventory.confirmedOrTrue
+import org.kamiblue.client.util.inventory.inventoryTask
+import org.kamiblue.client.util.inventory.operation.swapToBlockOrMove
+import org.kamiblue.client.util.inventory.operation.swapToSlot
+import org.kamiblue.client.util.inventory.operation.swapWith
+import org.kamiblue.client.util.inventory.slot.*
 import org.kamiblue.client.util.items.*
 import org.kamiblue.client.util.math.CoordinateConverter.asString
 import org.kamiblue.client.util.math.Direction
@@ -210,6 +217,7 @@ internal object HighwayTools : Module(
     private val doneTasks = LinkedHashMap<BlockPos, BlockTask>()
     private var sortedTasks: List<BlockTask> = emptyList()
     var lastTask: BlockTask? = null; private set
+    private var lastInventoryTask: InventoryTask? = null
 
     private val packetLimiterMutex = Mutex()
     private val packetLimiter = ArrayDeque<Long>()
@@ -421,6 +429,7 @@ internal object HighwayTools : Module(
             updateFood()
 
             if (!rubberbandTimer.tick(rubberbandTimeout.toLong(), false) ||
+                !lastInventoryTask.confirmedOrTrue ||
                 PauseProcess.isActive ||
                 AutoObsidian.isActive() ||
                 (world.difficulty == EnumDifficulty.PEACEFUL &&
@@ -582,7 +591,7 @@ internal object HighwayTools : Module(
             val zDirection = startingDirection
             val xDirection = zDirection.clockwise(if (zDirection.isDiagonal) 1 else 2)
 
-            for (x in -maxReach.floorToInt()..maxReach.ceilToInt()) {
+            for (x in -maxReach.floorToInt() * 2..maxReach.ceilToInt() * 2) {
                 val thisPos = basePos.add(zDirection.directionVec.multiply(x))
                 if (clearSpace) generateClear(thisPos, xDirection)
                 if (mode == Mode.TUNNEL) {
@@ -598,16 +607,16 @@ internal object HighwayTools : Module(
                     generateBase(thisPos, xDirection)
                 }
             }
-            if (mode == Mode.TUNNEL && !cleanFloor) {
+            if (mode == Mode.TUNNEL && (!cleanFloor || backfill)) {
                 if (startingDirection.isDiagonal) {
-                    for (x in 1..maxReach.floorToInt()) {
-                        blueprint[basePos.add(zDirection.directionVec.multiply(x))] = fillerMat
-                    }
-                } else {
                     for (x in 1..maxReach.floorToInt()) {
                         val pos = basePos.add(zDirection.directionVec.multiply(x))
                         blueprint[pos] = fillerMat
-                        blueprint[pos.add(startingDirection.clockwise(4).directionVec)] = fillerMat
+                        blueprint[pos.add(startingDirection.clockwise(7).directionVec)] = fillerMat
+                    }
+                } else {
+                    for (x in 1..maxReach.floorToInt()) {
+                        blueprint[basePos.add(zDirection.directionVec.multiply(x))] = fillerMat
                     }
                 }
             }
@@ -1310,8 +1319,10 @@ internal object HighwayTools : Module(
             slotFrom.toHotbarSlotOrNull()?.let {
                 swapToSlot(it)
             } ?: run {
-                val slotTo = player.hotbarSlots.firstEmpty()?.hotbarSlot ?: 0
-                moveToHotbar(slotFrom.slotNumber, slotTo)
+                val slotTo = player.hotbarSlots.firstEmpty() ?: player.firstHotbarSlot
+                lastInventoryTask = inventoryTask {
+                    swapWith(slotFrom, slotTo)
+                }
             }
             true
         } else {
