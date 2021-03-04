@@ -314,16 +314,16 @@ internal object HighwayTools : Module(
 
             if (!anonymizeStats) {
                 if (startingDirection.isDiagonal) {
-                    MessageSendHelper.sendRawChatMessage("    §9> §7Axis offset: §a${startingBlockPos.x} ${startingBlockPos.z}§r")
+                    MessageSendHelper.sendRawChatMessage("    §9> §7Axis offset: §a%,d %,d§r".format(startingBlockPos.x, startingBlockPos.z))
 
                     if (abs(startingBlockPos.x) != abs(startingBlockPos.z)) {
                         MessageSendHelper.sendRawChatMessage("    §9> §cYou may have an offset to diagonal highway position!")
                     }
                 } else {
                     if (startingDirection == Direction.NORTH || startingDirection == Direction.SOUTH) {
-                        MessageSendHelper.sendRawChatMessage("    §9> §7Axis offset: §a${startingBlockPos.x}§r")
+                        MessageSendHelper.sendRawChatMessage("    §9> §7Axis offset: §a%,d§r".format(startingBlockPos.x))
                     } else {
-                        MessageSendHelper.sendRawChatMessage("    §9> §7Axis offset: §a${startingBlockPos.z}§r")
+                        MessageSendHelper.sendRawChatMessage("    §9> §7Axis offset: §a%,d§r".format(startingBlockPos.z))
                     }
 
                 }
@@ -358,9 +358,9 @@ internal object HighwayTools : Module(
 
     private fun printDisable() {
         if (info) {
-            MessageSendHelper.sendRawChatMessage("    §9> §7Placed blocks: §a$totalBlocksPlaced§r")
-            MessageSendHelper.sendRawChatMessage("    §9> §7Destroyed blocks: §a$totalBlocksBroken§r")
-            MessageSendHelper.sendRawChatMessage("    §9> §7Distance: §a${startingBlockPos.distanceTo(currentBlockPos).toInt()}§r")
+            MessageSendHelper.sendRawChatMessage("    §9> §7Placed blocks: §a%,d§r".format(totalBlocksPlaced))
+            MessageSendHelper.sendRawChatMessage("    §9> §7Destroyed blocks: §a%,d§r".format(totalBlocksBroken))
+            MessageSendHelper.sendRawChatMessage("    §9> §7Distance: §a%,d§r".format(startingBlockPos.distanceTo(currentBlockPos).toInt()))
         }
     }
 
@@ -609,13 +609,13 @@ internal object HighwayTools : Module(
             }
             if (mode == Mode.TUNNEL && (!cleanFloor || backfill)) {
                 if (startingDirection.isDiagonal) {
-                    for (x in 1..maxReach.floorToInt()) {
+                    for (x in 0..maxReach.floorToInt()) {
                         val pos = basePos.add(zDirection.directionVec.multiply(x))
                         blueprint[pos] = fillerMat
                         blueprint[pos.add(startingDirection.clockwise(7).directionVec)] = fillerMat
                     }
                 } else {
-                    for (x in 1..maxReach.floorToInt()) {
+                    for (x in 0..maxReach.floorToInt()) {
                         blueprint[basePos.add(zDirection.directionVec.multiply(x))] = fillerMat
                     }
                 }
