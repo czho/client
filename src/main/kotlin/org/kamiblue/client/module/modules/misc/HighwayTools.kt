@@ -1277,14 +1277,11 @@ internal object HighwayTools : Module(
     }
 
     private fun SafeClientEvent.shouldBridge(): Boolean {
-        var containsPlace = false
-        for (task in sortedTasks) {
-            if (task.taskState == TaskState.PLACE) {
-                containsPlace = true
-                if (getBetterNeighbour(task.blockPos, placementSearch, maxReach, true).isNotEmpty()) return false
-            }
+        return world.isAirBlock(currentBlockPos.add(startingDirection.directionVec).down()) &&
+            !sortedTasks.any {
+            it.taskState == TaskState.PLACE &&
+                getBetterNeighbour(it.blockPos, placementSearch, maxReach, true).isNotEmpty()
         }
-        return containsPlace
     }
 
     private fun SafeClientEvent.getBestTool(blockTask: BlockTask): Slot? {
