@@ -138,6 +138,7 @@ internal object HighwayTools : Module(
     private val maxReach by setting("Max Reach", 4.9f, 1.0f..6.0f, 0.1f, { page == Page.BEHAVIOR }, description = "Sets the range of the blueprint. Decrease when tasks fail!")
     private val maxBreaks by setting("Multi Break", 1, 1..5, 1, { page == Page.BEHAVIOR }, description = "EXPERIMENTAL: Breaks multiple instant breaking blocks per tick in view")
     private val limitFactor by setting("Limit Factor", 1.0f, 0.5f..2.0f, 0.01f, { page == Page.BEHAVIOR }, description = "EXPERIMENTAL: Factor for TPS which acts as limit for maximum breaks per second.")
+    private val emptyDisable by setting("Disable on no Tools", true, { page == Page.BEHAVIOR }, description = "Disables when no pickaxes are left")
     private val placementSearch by setting("Place Deep Search", 2, 1..4, 1, { page == Page.BEHAVIOR }, description = "EXPERIMENTAL: Attempts to find a support block for placing against")
 
     // stat settings
@@ -1305,14 +1306,15 @@ internal object HighwayTools : Module(
     }
 
     private fun SafeClientEvent.swapOrMoveBestTool(blockTask: BlockTask): Boolean {
+        if (emptyDisable && player.allSlots.countItem(Items.DIAMOND_PICKAXE) == 0) {
+            MessageSendHelper.sendChatMessage("$chatName No Diamond Pickaxe was found in inventory, disable")
+            mc.soundHandler.playSound(PositionedSoundRecord.getRecord(SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f))
+            disable()
+        }
+
         val slotFrom = getBestTool(blockTask)
 
         return if (slotFrom != null) {
-//            if (emptyDisable && slotFrom.stack.item != Items.DIAMOND_PICKAXE) {
-//                MessageSendHelper.sendChatMessage("$chatName No ${Items.DIAMOND_PICKAXE.registryName} was found in inventory, disable")
-//                mc.soundHandler.playSound(PositionedSoundRecord.getRecord(SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f))
-//                disable()
-//            }
             slotFrom.toHotbarSlotOrNull()?.let {
                 swapToSlot(it)
             } ?: run {
