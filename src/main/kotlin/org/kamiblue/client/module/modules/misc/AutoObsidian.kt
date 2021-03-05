@@ -291,7 +291,12 @@ internal object AutoObsidian : Module(
         } else {
             MessageSendHelper.sendChatMessage("$chatName No valid position for placing shulker box / ender chest nearby, disabling.")
             mc.soundHandler.playSound(PositionedSoundRecord.getRecord(SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f))
-            if (!noDisable) disable()
+            if (!noDisable) {
+                disable()
+            } else {
+                disable()
+                enable()
+            }
         }
     }
 
@@ -473,7 +478,12 @@ internal object AutoObsidian : Module(
             if (!moved) {
                 MessageSendHelper.sendChatMessage("$chatName No shulker box was found in inventory, disabling.")
                 mc.soundHandler.playSound(PositionedSoundRecord.getRecord(SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f))
-                if (!noDisable) disable()
+                if (!noDisable) {
+                    disable()
+                } else {
+                    disable()
+                    enable()
+                }
             }
 
             onInventoryOperation()
@@ -498,7 +508,12 @@ internal object AutoObsidian : Module(
             if (!moved) {
                 MessageSendHelper.sendChatMessage("$chatName No ender chest was found in inventory, disabling.")
                 mc.soundHandler.playSound(PositionedSoundRecord.getRecord(SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f))
-                if (!noDisable) disable()
+                if (!noDisable) {
+                    disable()
+                } else {
+                    disable()
+                    enable()
+                }
             }
 
             onInventoryOperation()
@@ -525,7 +540,12 @@ internal object AutoObsidian : Module(
                 } else {
                     MessageSendHelper.sendChatMessage("$chatName No ender chest was found in shulker, disabling.")
                     mc.soundHandler.playSound(PositionedSoundRecord.getRecord(SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f))
-                    if (!noDisable) disable()
+                    if (!noDisable) {
+                        disable()
+                    } else {
+                        disable()
+                        enable()
+                    }
                 }
             }
         } else {
@@ -643,7 +663,12 @@ internal object AutoObsidian : Module(
             if (!moved) {
                 MessageSendHelper.sendChatMessage("No valid pickaxe was found in inventory.")
                 mc.soundHandler.playSound(PositionedSoundRecord.getRecord(SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f))
-                if (!noDisable) disable()
+                if (!noDisable) {
+                    disable()
+                } else {
+                    disable()
+                    enable()
+                }
             }
 
             onInventoryOperation()
