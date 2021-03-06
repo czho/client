@@ -827,7 +827,6 @@ internal object HighwayTools : Module(
                 if (task.taskState != TaskState.DONE && waitTicks > 0) return
 
                 doTask(task, false)
-                doPathing()
 
                 when (task.taskState) {
                     TaskState.DONE, TaskState.BROKEN, TaskState.PLACED -> {
