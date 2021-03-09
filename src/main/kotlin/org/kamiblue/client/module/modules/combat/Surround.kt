@@ -7,7 +7,9 @@ import net.minecraft.util.math.BlockPos
 import net.minecraftforge.fml.common.gameevent.TickEvent
 import org.kamiblue.client.event.SafeClientEvent
 import org.kamiblue.client.manager.managers.CombatManager
-import org.kamiblue.client.manager.managers.PlayerPacketManager
+import org.kamiblue.client.manager.managers.HotbarManager.resetHotbar
+import org.kamiblue.client.manager.managers.HotbarManager.spoofHotbar
+import org.kamiblue.client.manager.managers.PlayerPacketManager.sendPlayerPacket
 import org.kamiblue.client.module.Category
 import org.kamiblue.client.module.Module
 import org.kamiblue.client.module.modules.movement.Strafe
@@ -19,6 +21,7 @@ import org.kamiblue.client.util.WorldUtils.getPlaceInfo
 import org.kamiblue.client.util.WorldUtils.isPlaceable
 import org.kamiblue.client.util.combat.SurroundUtils
 import org.kamiblue.client.util.combat.SurroundUtils.checkHole
+import org.kamiblue.client.util.inventory.slot.HotbarSlot
 import org.kamiblue.client.util.inventory.slot.firstBlock
 import org.kamiblue.client.util.inventory.slot.hotbarSlots
 import org.kamiblue.client.util.math.VectorUtils.toBlockPos
@@ -46,8 +49,9 @@ internal object Surround : Module(
         ONE_TIME, OUT_OF_HOLE
     }
 
+    private val toggleTimer = StopTimer(TimeUnit.TICKS)
+
     private var holePos: BlockPos? = null
-    private var toggleTimer = StopTimer(TimeUnit.TICKS)
     private var job: Job? = null
 
     override fun isActive(): Boolean {
@@ -55,26 +59,24 @@ internal object Surround : Module(
     }
 
     init {
-        onEnable {
-            toggleTimer.reset()
-        }
-
         onDisable {
-            PlayerPacketManager.resetHotbar()
-            toggleTimer.reset()
+            resetHotbar()
             holePos = null
         }
 
+        onToggle {
+            toggleTimer.reset()
+        }
 
         safeListener<TickEvent.ClientTickEvent> {
             if (getObby() == null) return@safeListener
+
             if (isDisabled) {
                 enableInHoleCheck()
                 return@safeListener
             }
 
             // Following codes will not run if disabled
-
             // Update hole pos
             if (holePos == null || inHoleCheck()) {
                 holePos = player.positionVector.toBlockPos()
@@ -88,14 +90,14 @@ internal object Surround : Module(
                 toggleTimer.reset()
             }
 
-            // Centered check
-            if (!player.centerPlayer()) return@safeListener
-
             // Placeable
             if (!canRun()) {
                 if (autoDisable == AutoDisableMode.ONE_TIME) disable()
                 return@safeListener
             }
+
+            // Centered check
+            if (!player.centerPlayer()) return@safeListener
 
             if (disableStrafe) {
                 Strafe.disable()
@@ -105,10 +107,13 @@ internal object Surround : Module(
             if (!job.isActiveOrFalse) {
                 job = runSurround()
             } else if (job.isActiveOrFalse) {
-                spoofHotbar()
-                PlayerPacketManager.addPacket(Surround, PlayerPacketManager.PlayerPacket(rotating = false))
+                spoofObby()
+                sendPlayerPacket {
+                    cancelMove()
+                    cancelRotate()
+                }
             } else if (isEnabled && CombatManager.isOnTopPriority(Surround)) {
-                PlayerPacketManager.resetHotbar()
+                resetHotbar()
             }
         }
     }
@@ -135,11 +140,11 @@ internal object Surround : Module(
         }
     }
 
-    private fun SafeClientEvent.spoofHotbar() {
-        getObby()?.let { PlayerPacketManager.spoofHotbar(it) }
+    private fun SafeClientEvent.spoofObby() {
+        getObby()?.let { spoofHotbar(it) }
     }
 
-    private fun SafeClientEvent.getObby(): Int? {
+    private fun SafeClientEvent.getObby(): HotbarSlot? {
         val slots = player.hotbarSlots.firstBlock(Blocks.OBSIDIAN)
 
         if (slots == null) { // Obsidian check
@@ -150,20 +155,18 @@ internal object Surround : Module(
             return null
         }
 
-        return slots.hotbarSlot
+        return slots
     }
 
     private fun SafeClientEvent.canRun(): Boolean {
         val playerPos = player.positionVector.toBlockPos()
-        for (offset in SurroundUtils.surroundOffset) {
-            val pos = playerPos.add(offset)
-            if (isPlaceable(pos, true)) return true
+        return SurroundUtils.surroundOffset.any {
+            isPlaceable(playerPos.add(it), true)
         }
-        return false
     }
 
     private fun SafeClientEvent.runSurround() = defaultScope.launch {
-        spoofHotbar()
+        spoofObby()
 
         buildStructure(placeSpeed) {
             if (isEnabled && CombatManager.isOnTopPriority(this@Surround)) {

@@ -37,6 +37,7 @@ import org.kamiblue.client.event.SafeClientEvent
 import org.kamiblue.client.event.events.PacketEvent
 import org.kamiblue.client.event.events.RenderWorldEvent
 import org.kamiblue.client.manager.managers.PlayerPacketManager
+import org.kamiblue.client.manager.managers.PlayerPacketManager.sendPlayerPacket
 import org.kamiblue.client.module.Category
 import org.kamiblue.client.module.Module
 import org.kamiblue.client.module.modules.client.Hud.primaryColor
@@ -517,8 +518,9 @@ internal object HighwayTools : Module(
 
         when (interacting) {
             RotationMode.SPOOF -> {
-                val packet = PlayerPacketManager.PlayerPacket(rotating = true, rotation = rotation)
-                PlayerPacketManager.addPacket(this@HighwayTools, packet)
+                sendPlayerPacket {
+                    rotate(rotation)
+                }
             }
             RotationMode.VIEW_LOCK -> {
                 player.rotationYaw = rotation.x
