@@ -1454,7 +1454,7 @@ internal object HighwayTools : Module(
 
                 if (size > limit * limitFactor) {
                     if (debugMessages == DebugMessages.ALL) {
-                        MessageSendHelper.sendChatMessage("$chatName Dropped possible instant mine action @ TPS(${TpsCalculator.tickRate}) Actions(${size})")
+                        MessageSendHelper.sendChatMessage("$chatName Dropped possible instant mine action @ TPS($limit) Actions(${size})")
                     }
                     break
                 }
