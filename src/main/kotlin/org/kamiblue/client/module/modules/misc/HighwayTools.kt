@@ -84,7 +84,6 @@ import kotlin.random.Random.Default.nextInt
 /**
  * @author Avanatiker
  * @since 20/08/2020
- *
  */
 internal object HighwayTools : Module(
     name = "HighwayTools",
@@ -435,7 +434,9 @@ internal object HighwayTools : Module(
                 AutoObsidian.isActive() ||
                 (world.difficulty == EnumDifficulty.PEACEFUL &&
                     player.dimension == 1 &&
-                    player.serverBrand.contains("2b2t"))) {
+                    @Suppress("UNNECESSARY_SAFE_CALL")
+                    player.serverBrand?.contains("2b2t") == true
+                    )) {
                 refreshData()
                 return@safeListener
             }
