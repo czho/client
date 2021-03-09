@@ -137,6 +137,7 @@ internal object HighwayTools : Module(
     private val rubberbandTimeout by setting("Rubberband Timeout", 50, 5..100, 5, { page == Page.BEHAVIOR }, description = "Timeout for pausing after a lag")
     private val maxReach by setting("Max Reach", 4.9f, 1.0f..6.0f, 0.1f, { page == Page.BEHAVIOR }, description = "Sets the range of the blueprint. Decrease when tasks fail!")
     private val maxBreaks by setting("Multi Break", 1, 1..5, 1, { page == Page.BEHAVIOR }, description = "EXPERIMENTAL: Breaks multiple instant breaking blocks per tick in view")
+    private val limitOrigin by setting("Limited by", LimitMode.FIXED, { page == Page.BEHAVIOR }, description = "Changes the origin of limit: Client / Server TPS")
     private val limitFactor by setting("Limit Factor", 1.0f, 0.5f..2.0f, 0.01f, { page == Page.BEHAVIOR }, description = "EXPERIMENTAL: Factor for TPS which acts as limit for maximum breaks per second.")
     private val emptyDisable by setting("Disable on no Tools", true, { page == Page.BEHAVIOR }, description = "Disables when no pickaxes are left")
     private val placementSearch by setting("Place Deep Search", 2, 1..4, 1, { page == Page.BEHAVIOR }, description = "EXPERIMENTAL: Attempts to find a support block for placing against")
@@ -174,6 +175,10 @@ internal object HighwayTools : Module(
     @Suppress("UNUSED")
     private enum class RotationMode {
         OFF, SPOOF, VIEW_LOCK
+    }
+
+    private enum class LimitMode {
+        FIXED, SERVER
     }
 
     private enum class DebugMessages {
@@ -1442,7 +1447,12 @@ internal object HighwayTools : Module(
                     packetLimiter.size
                 }
 
-                if (size > TpsCalculator.tickRate * limitFactor) {
+                val limit = when (limitOrigin) {
+                    LimitMode.FIXED -> 20.0f
+                    LimitMode.SERVER -> TpsCalculator.tickRate
+                }
+
+                if (size > limit * limitFactor) {
                     if (debugMessages == DebugMessages.ALL) {
                         MessageSendHelper.sendChatMessage("$chatName Dropped possible instant mine action @ TPS(${TpsCalculator.tickRate}) Actions(${size})")
                     }
@@ -1479,20 +1489,13 @@ internal object HighwayTools : Module(
 
     /* Dispatches a thread to mine any non-netherrack blocks generically */
     private fun mineBlockNormal(blockTask: BlockTask, side: EnumFacing) {
+        if (blockTask.taskState == TaskState.BREAK) {
+            blockTask.updateState(TaskState.BREAKING)
+        }
+
         defaultScope.launch {
             delay(20L)
-            if (blockTask.taskState == TaskState.BREAK) {
-                blockTask.updateState(TaskState.BREAKING)
-                onMainThreadSafe {
-                    connection.sendPacket(CPacketPlayerDigging(CPacketPlayerDigging.Action.START_DESTROY_BLOCK, blockTask.blockPos, side))
-                    player.swingArm(EnumHand.MAIN_HAND)
-                }
-            } else {
-                onMainThreadSafe {
-                    connection.sendPacket(CPacketPlayerDigging(CPacketPlayerDigging.Action.STOP_DESTROY_BLOCK, blockTask.blockPos, side))
-                    player.swingArm(EnumHand.MAIN_HAND)
-                }
-            }
+            sendMiningPackets(blockTask.blockPos, side)
         }
     }
 
