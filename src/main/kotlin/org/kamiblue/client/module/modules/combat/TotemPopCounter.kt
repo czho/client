@@ -10,7 +10,6 @@ import org.kamiblue.client.event.events.PacketEvent
 import org.kamiblue.client.manager.managers.FriendManager
 import org.kamiblue.client.module.Category
 import org.kamiblue.client.module.Module
-import org.kamiblue.client.util.color.EnumTextColor
 import org.kamiblue.client.util.text.MessageSendHelper
 import org.kamiblue.client.util.text.MessageSendHelper.sendServerMessage
 import org.kamiblue.client.util.text.format
@@ -29,8 +28,6 @@ internal object TotemPopCounter : Module(
     private val countSelf by setting("Count Self", true)
     private val announceSetting by setting("Announce", Announce.CLIENT)
     private val thanksTo by setting("Thanks To", false)
-    private val colorName by setting("Color Name", EnumTextColor.DARK_PURPLE)
-    private val colorNumber by setting("Color Number", EnumTextColor.LIGHT_PURPLE)
 
     private enum class Announce {
         CLIENT, EVERYONE
@@ -54,7 +51,7 @@ internal object TotemPopCounter : Module(
                 popCountMap[player] = count
 
                 val isSelf = player == this.player
-                val message = "${formatName(player)} popped ${formatNumber(count)} ${plural(count)}${ending(isSelf)}"
+                val message = "$player popped $count ${plural(count)}${ending(isSelf)}"
                 sendMessage(message, !isSelf && isPublic)
             }
         }
@@ -80,7 +77,7 @@ internal object TotemPopCounter : Module(
                 if (player == this.player || player.isEntityAlive) {
                     false
                 } else {
-                    val message = "${formatName(player)} died after popping ${formatNumber(count)} ${plural(count)}${ending(false)}"
+                    val message = "$player died after popping $count ${plural(count)}${ending(false)}"
                     sendMessage(message, isPublic)
                     true
                 }
@@ -92,23 +89,9 @@ internal object TotemPopCounter : Module(
 
     private fun selfCheck(player: EntityPlayer) = countSelf || player != mc.player
 
-    private fun formatName(player: EntityPlayer) =
-        colorName.textFormatting format when {
-            player == mc.player -> {
-                "I"
-            }
-            FriendManager.isFriend(player.name) -> {
-                if (isPublic) "My friend ${player.name}, " else "Your friend ${player.name}, "
-            }
-            else -> {
-                player.name
-            }
-        }
-
     private val isPublic: Boolean
         get() = announceSetting == Announce.EVERYONE
 
-    private fun formatNumber(message: Int) = colorNumber.textFormatting format message
 
     private fun plural(count: Int) = if (count == 1) "totem" else "totems"
 

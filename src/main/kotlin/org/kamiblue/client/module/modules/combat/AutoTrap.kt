@@ -40,7 +40,6 @@ internal object AutoTrap : Module(
 ) {
     private val trapMode = setting("Trap Mode", TrapMode.FULL_TRAP)
     private val selfTrap = setting("Self Trap", false)
-    private val bindSelfTrap = setting("Bind Self Trap", Bind())
     private val autoDisable = setting("Auto Disable", true)
     private val strictDirection by setting("Strict Direction", false)
     private val placeSpeed = setting("Places Per Tick", 4f, 0.25f..5f, 0.25f)
@@ -71,11 +70,7 @@ internal object AutoTrap : Module(
             }
         }
 
-        listener<InputEvent.KeyInputEvent> {
-            if (bindSelfTrap.value.isDown(Keyboard.getEventKey())) {
-                selfTrap.value = !selfTrap.value
-            }
-        }
+
     }
 
     private fun SafeClientEvent.canRun(): Boolean {

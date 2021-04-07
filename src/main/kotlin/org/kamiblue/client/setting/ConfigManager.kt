@@ -8,7 +8,6 @@ internal object ConfigManager {
     private val configSet = NameableSet<IConfig>()
 
     init {
-        register(GuiConfig)
         register(ModuleConfig)
     }
 

@@ -6,7 +6,6 @@ import net.minecraftforge.fml.common.gameevent.TickEvent
 import org.kamiblue.client.event.Phase
 import org.kamiblue.client.event.events.OnUpdateWalkingPlayerEvent
 import org.kamiblue.client.event.events.PacketEvent
-import org.kamiblue.client.event.events.RenderEntityEvent
 import org.kamiblue.client.manager.Manager
 import org.kamiblue.client.mixin.*
 import org.kamiblue.client.mixin.client.accessor.*
@@ -59,28 +58,7 @@ object PlayerPacketManager : Manager {
             prevServerSideRotation = serverSideRotation
         }
 
-        listener<RenderEntityEvent.All> {
-            if (it.entity != Wrapper.player || it.entity.isRiding) return@listener
 
-            when (it.phase) {
-                Phase.PRE -> {
-                    with(it.entity) {
-                        clientSidePitch = Vec2f(prevRotationPitch, rotationPitch)
-                        prevRotationPitch = prevServerSideRotation.y
-                        rotationPitch = serverSideRotation.y
-                    }
-                }
-                Phase.POST -> {
-                    with(it.entity) {
-                        prevRotationPitch = clientSidePitch.x
-                        rotationPitch = clientSidePitch.y
-                    }
-                }
-                else -> {
-                    // Ignored
-                }
-            }
-        }
     }
 
     inline fun AbstractModule.sendPlayerPacket(block: Packet.Builder.() -> Unit) {

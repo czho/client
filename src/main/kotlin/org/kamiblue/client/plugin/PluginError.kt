@@ -1,7 +1,6 @@
 package org.kamiblue.client.plugin
 
 import org.kamiblue.client.KamiMod
-import org.kamiblue.client.gui.mc.KamiGuiPluginError
 import org.kamiblue.client.util.Wrapper
 
 internal enum class PluginError {
@@ -39,7 +38,8 @@ internal enum class PluginError {
             latestErrors = null
 
             if (!errors.isNullOrEmpty()) {
-                Wrapper.minecraft.displayGuiScreen(KamiGuiPluginError(Wrapper.minecraft.currentScreen, errors))
+                KamiMod.LOG.error(errors)
+
             }
         }
     }

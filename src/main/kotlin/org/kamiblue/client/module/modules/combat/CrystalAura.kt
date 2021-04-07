@@ -58,7 +58,6 @@ import org.kamiblue.client.util.world.getClosestVisibleSide
 import org.kamiblue.commons.extension.synchronized
 import org.kamiblue.commons.interfaces.DisplayEnum
 import org.kamiblue.event.listener.listener
-import org.lwjgl.input.Keyboard
 import java.util.*
 import kotlin.collections.ArrayList
 import kotlin.collections.HashMap
@@ -84,7 +83,6 @@ internal object CrystalAura : Module(
     private val swingMode by setting("Swing Mode", SwingMode.CLIENT, page.atValue(Page.GENERAL))
 
     /* Force place */
-    private val bindForcePlace by setting("Bind Force Place", Bind(), page.atValue(Page.FORCE_PLACE))
     private val forcePlaceHealth by setting("Force Place Health", 5.0f, 0.0f..20.0f, 0.5f, page.atValue(Page.FORCE_PLACE))
     private val forcePlaceArmorDura by setting("Force Place Armor Dura", 3, 0..50, 1, page.atValue(Page.FORCE_PLACE))
     private val minDamageForcePlace by setting("Min Damage Force Place", 1.5f, 0.0f..10.0f, 0.25f, page.atValue(Page.FORCE_PLACE))
@@ -186,12 +184,6 @@ internal object CrystalAura : Module(
             resetHotbar()
         }
 
-        listener<InputEvent.KeyInputEvent> {
-            if (bindForcePlace.isDown(Keyboard.getEventKey())) {
-                forcePlacing = !forcePlacing
-                MessageSendHelper.sendChatMessage("$chatName Force placing" + if (forcePlacing) " &aenabled" else " &cdisabled")
-            }
-        }
 
         safeListener<PacketEvent.Receive> { event ->
             when (event.packet) {

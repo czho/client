@@ -8,22 +8,17 @@ import net.minecraft.util.EnumHand
 import net.minecraft.util.math.AxisAlignedBB
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Vec3d
-import net.minecraftforge.fml.common.gameevent.InputEvent
 import net.minecraftforge.fml.common.gameevent.TickEvent
 import org.kamiblue.client.event.SafeClientEvent
-import org.kamiblue.client.event.events.RenderWorldEvent
 import org.kamiblue.client.manager.managers.CombatManager
 import org.kamiblue.client.manager.managers.HotbarManager.resetHotbar
 import org.kamiblue.client.manager.managers.HotbarManager.serverSideItem
 import org.kamiblue.client.manager.managers.HotbarManager.spoofHotbar
-import org.kamiblue.client.manager.managers.PlayerPacketManager
 import org.kamiblue.client.manager.managers.PlayerPacketManager.sendPlayerPacket
 import org.kamiblue.client.module.Category
 import org.kamiblue.client.module.Module
 import org.kamiblue.client.util.*
-import org.kamiblue.client.util.color.ColorHolder
 import org.kamiblue.client.util.combat.CrystalUtils.calcCrystalDamage
-import org.kamiblue.client.util.graphics.ESPRenderer
 import org.kamiblue.client.util.items.block
 import org.kamiblue.client.util.items.firstBlock
 import org.kamiblue.client.util.items.hotbarSlots
@@ -36,7 +31,6 @@ import org.kamiblue.client.util.world.getNeighbour
 import org.kamiblue.client.util.world.hasNeighbour
 import org.kamiblue.client.util.world.isPlaceable
 import org.kamiblue.event.listener.listener
-import org.lwjgl.input.Keyboard
 import java.util.*
 
 @CombatManager.CombatModule
@@ -46,13 +40,11 @@ internal object CrystalBasePlace : Module(
     category = Category.COMBAT,
     modulePriority = 90
 ) {
-    private val manualPlaceBind = setting("Bind Manual Place", Bind())
     private val minDamageInc = setting("Min Damage Inc", 2.0f, 0.0f..10.0f, 0.25f)
     private val range = setting("Range", 4.0f, 0.0f..8.0f, 0.5f)
     private val delay = setting("Delay", 20, 0..50, 5)
 
     private val timer = TickTimer()
-    private val renderer = ESPRenderer().apply { aFilled = 33; aOutline = 233 }
     private var inactiveTicks = 0
     private var rotationTo: Vec3d? = null
     private var placePacket: CPacketPlayerTryUseItemOnBlock? = null
@@ -68,17 +60,9 @@ internal object CrystalBasePlace : Module(
             resetHotbar()
         }
 
-        listener<RenderWorldEvent> {
-            val clear = inactiveTicks >= 30
-            renderer.render(clear)
-        }
 
-        safeListener<InputEvent.KeyInputEvent> {
-            if (!CombatManager.isOnTopPriority(this@CrystalBasePlace) || CombatSetting.pause) return@safeListener
-            val target = CombatManager.target ?: return@safeListener
 
-            if (manualPlaceBind.value.isDown(Keyboard.getEventKey())) prePlace(target)
-        }
+
 
         safeListener<TickEvent.ClientTickEvent> {
             if (it.phase != TickEvent.Phase.START) return@safeListener
@@ -127,8 +111,6 @@ internal object CrystalBasePlace : Module(
             rotationTo = placeInfo.hitVec
             placePacket = CPacketPlayerTryUseItemOnBlock(placeInfo.pos, placeInfo.side, EnumHand.MAIN_HAND, placeInfo.hitVecOffset.x.toFloat(), placeInfo.hitVecOffset.y.toFloat(), placeInfo.hitVecOffset.z.toFloat())
 
-            renderer.clear()
-            renderer.add(placeInfo.placedPos, ColorHolder(255, 255, 255))
 
             inactiveTicks = 0
             timer.reset()

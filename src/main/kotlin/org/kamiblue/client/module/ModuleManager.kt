@@ -62,12 +62,7 @@ object ModuleManager : AsyncLoader<List<Class<out AbstractModule>>> {
         modulesDelegate.update()
     }
 
-    internal fun onBind(eventKey: Int) {
-        if (Keyboard.isKeyDown(Keyboard.KEY_F3)) return  // if key is the 'none' key (stuff like mod key in i3 might return 0)
-        for (module in modules) {
-            if (module.bind.value.isDown(eventKey)) module.toggle()
-        }
-    }
+
 
     fun getModuleOrNull(moduleName: String?) = moduleName?.let { moduleSet[it] }
 }

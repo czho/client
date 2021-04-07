@@ -8,7 +8,6 @@ import net.minecraftforge.fml.common.event.FMLPreInitializationEvent
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
 import org.kamiblue.client.event.ForgeEventProcessor
-import org.kamiblue.client.gui.mc.KamiGuiUpdateNotification
 import org.kamiblue.client.util.ConfigUtils
 import org.kamiblue.client.util.threads.BackgroundScope
 import java.io.File
@@ -50,7 +49,6 @@ class KamiMod {
         val directory = File(DIRECTORY)
         if (!directory.exists()) directory.mkdir()
 
-        KamiGuiUpdateNotification.updateCheck()
         LoaderWrapper.preLoadAll()
     }
 

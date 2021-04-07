@@ -18,7 +18,6 @@ import net.minecraftforge.fml.common.gameevent.TickEvent
 import net.minecraftforge.registries.GameData
 import org.kamiblue.client.event.Phase
 import org.kamiblue.client.event.events.PacketEvent
-import org.kamiblue.client.event.events.RenderEntityEvent
 import org.kamiblue.client.module.Category
 import org.kamiblue.client.module.Module
 import org.kamiblue.client.util.threads.runSafe
@@ -130,16 +129,6 @@ internal object NoRender : Module(
                         }
                     }
                 }
-            }
-        }
-
-        listener<RenderEntityEvent.All> {
-            if (it.phase != Phase.PRE) return@listener
-
-            if (entityList.contains(it.entity.javaClass)
-                || animals.value && it.entity is IAnimals && it.entity !is EntityMob
-                || mobs.value && it.entity is EntityMob) {
-                it.cancel()
             }
         }
 

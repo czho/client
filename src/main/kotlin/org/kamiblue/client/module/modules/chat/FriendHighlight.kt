@@ -8,7 +8,6 @@ import net.minecraftforge.client.event.ClientChatReceivedEvent
 import org.kamiblue.client.manager.managers.FriendManager
 import org.kamiblue.client.module.Category
 import org.kamiblue.client.module.Module
-import org.kamiblue.client.util.color.EnumTextColor
 import org.kamiblue.client.util.text.MessageSendHelper
 import org.kamiblue.event.listener.listener
 
@@ -19,7 +18,6 @@ internal object FriendHighlight : Module(
     showOnArray = false
 ) {
     private val bold = setting("Bold", true)
-    private val color = setting("Color", EnumTextColor.GRAY)
     private val sound = setting("Sound", true)
 
     private val regex1 = "<(.*?)>".toRegex()
@@ -50,7 +48,7 @@ internal object FriendHighlight : Module(
         }
     }
 
-    private fun getReplacement(name: String) = "${color.value.textFormatting}${bold()}$name${TextFormatting.RESET}"
+    private fun getReplacement(name: String) = "${bold()}$name${TextFormatting.RESET}"
 
     private fun bold() = if (!bold.value) "" else TextFormatting.BOLD.toString()
 }

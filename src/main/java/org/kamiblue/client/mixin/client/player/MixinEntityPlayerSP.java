@@ -16,7 +16,6 @@ import net.minecraft.world.World;
 import org.kamiblue.client.event.KamiEventBus;
 import org.kamiblue.client.event.events.OnUpdateWalkingPlayerEvent;
 import org.kamiblue.client.event.events.PlayerMoveEvent;
-import org.kamiblue.client.gui.mc.KamiGuiBeacon;
 import org.kamiblue.client.manager.managers.MessageManager;
 import org.kamiblue.client.manager.managers.PlayerPacketManager;
 import org.kamiblue.client.module.modules.chat.PortalChat;
@@ -71,15 +70,7 @@ public abstract class MixinEntityPlayerSP extends EntityPlayer {
      * @author TBM
      * Used with full permission from TBM - l1ving
      */
-    @Inject(method = "displayGUIChest", at = @At("HEAD"), cancellable = true)
-    public void onDisplayGUIChest(IInventory chestInventory, CallbackInfo ci) {
-        if (BeaconSelector.INSTANCE.isEnabled()) {
-            if (chestInventory instanceof IInteractionObject && "minecraft:beacon".equals(((IInteractionObject) chestInventory).getGuiID())) {
-                Minecraft.getMinecraft().displayGuiScreen(new KamiGuiBeacon(this.inventory, chestInventory));
-                ci.cancel();
-            }
-        }
-    }
+
 
     @Inject(method = "move", at = @At("HEAD"), cancellable = true)
     public void moveHead(MoverType type, double x, double y, double z, CallbackInfo ci) {

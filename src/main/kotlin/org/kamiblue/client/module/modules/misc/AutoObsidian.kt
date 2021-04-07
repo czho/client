@@ -31,7 +31,6 @@ import net.minecraftforge.fml.common.gameevent.TickEvent
 import org.kamiblue.client.event.SafeClientEvent
 import org.kamiblue.client.event.events.BlockBreakEvent
 import org.kamiblue.client.event.events.PacketEvent
-import org.kamiblue.client.event.events.RenderWorldEvent
 import org.kamiblue.client.manager.managers.PlayerPacketManager.sendPlayerPacket
 import org.kamiblue.client.module.Category
 import org.kamiblue.client.module.Module
@@ -40,8 +39,6 @@ import org.kamiblue.client.process.PauseProcess
 import org.kamiblue.client.util.*
 import org.kamiblue.client.util.EntityUtils.getDroppedItem
 import org.kamiblue.client.util.EntityUtils.getDroppedItems
-import org.kamiblue.client.util.color.ColorHolder
-import org.kamiblue.client.util.graphics.ESPRenderer
 import org.kamiblue.client.util.items.*
 import org.kamiblue.client.util.math.RotationUtils.getRotationTo
 import org.kamiblue.client.util.math.VectorUtils
@@ -122,7 +119,6 @@ internal object AutoObsidian : Module(
 
     private val miningMap = HashMap<BlockPos, Pair<Int, Long>>() // <BlockPos, <Breaker ID, Last Update Time>>
 
-    private val renderer = ESPRenderer().apply { aFilled = 33; aOutline = 233 }
 
     override fun isActive(): Boolean {
         return isEnabled && active
@@ -167,9 +163,7 @@ internal object AutoObsidian : Module(
             }
         }
 
-        listener<RenderWorldEvent> {
-            if (state != State.DONE) renderer.render(clear = false, cull = true)
-        }
+
 
         safeListener<TickEvent.ClientTickEvent>(69) {
             if (it.phase != TickEvent.Phase.START || PauseProcess.isActive ||
@@ -282,8 +276,8 @@ internal object AutoObsidian : Module(
                 placingPos = pair.first
                 canInstantMine = false
 
-                renderer.clear()
-                renderer.add(pair.first, ColorHolder(64, 255, 64))
+
+
             }
         } else {
             MessageSendHelper.sendChatMessage("$chatName No valid position for placing shulker box / ender chest nearby, disabling.")

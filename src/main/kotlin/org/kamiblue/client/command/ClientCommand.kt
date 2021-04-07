@@ -7,7 +7,6 @@ import net.minecraft.util.math.BlockPos
 import org.kamiblue.capeapi.PlayerProfile
 import org.kamiblue.client.event.ClientExecuteEvent
 import org.kamiblue.client.event.SafeExecuteEvent
-import org.kamiblue.client.gui.hudgui.AbstractHudElement
 import org.kamiblue.client.module.AbstractModule
 import org.kamiblue.client.module.modules.client.CommandConfig
 import org.kamiblue.client.util.Wrapper
@@ -35,13 +34,6 @@ abstract class ClientCommand(
         arg(ModuleArg(name), block)
     }
 
-    @CommandBuilder
-    protected inline fun AbstractArg<*>.hudElement(
-        name: String,
-        block: BuilderBlock<AbstractHudElement>
-    ) {
-        arg(HudElementArg(name), block)
-    }
 
     @CommandBuilder
     protected inline fun AbstractArg<*>.block(

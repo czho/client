@@ -6,14 +6,11 @@ import net.minecraft.util.math.Vec3d
 import net.minecraftforge.fml.common.gameevent.TickEvent
 import org.kamiblue.client.event.events.ConnectionEvent
 import org.kamiblue.client.event.events.PacketEvent
-import org.kamiblue.client.event.events.RenderOverlayEvent
 import org.kamiblue.client.module.Category
 import org.kamiblue.client.module.Module
 import org.kamiblue.client.process.PauseProcess.pauseBaritone
 import org.kamiblue.client.process.PauseProcess.unpauseBaritone
 import org.kamiblue.client.util.*
-import org.kamiblue.client.util.color.ColorHolder
-import org.kamiblue.client.util.graphics.font.FontRenderAdapter
 import org.kamiblue.client.util.math.Vec2f
 import org.kamiblue.client.util.text.MessageSendHelper
 import org.kamiblue.client.util.threads.safeListener
@@ -48,17 +45,16 @@ internal object LagNotifier : Module(
             unpause()
         }
 
-        listener<RenderOverlayEvent> {
-            if (text.isBlank()) return@listener
-
-            val resolution = ScaledResolution(mc)
-            val posX = resolution.scaledWidth / 2.0f - FontRenderAdapter.getStringWidth(text) / 2.0f
-            val posY = 80.0f / resolution.scaleFactor
-
-            /* 80px down from the top edge of the screen */
-            FontRenderAdapter.drawString(text, posX, posY, color = ColorHolder(255, 33, 33))
-            glColor4f(1.0f, 1.0f, 1.0f, 1.0f)
-        }
+//        listener<RenderOverlayEvent> {
+//            if (text.isBlank()) return@listener
+//
+//            val resolution = ScaledResolution(mc)
+//            val posX = resolution.scaledWidth / 2.0f - FontRenderAdapter.getStringWidth(text) / 2.0f
+//            val posY = 80.0f / resolution.scaleFactor
+//
+//            /* 80px down from the top edge of the screen */
+//            glColor4f(1.0f, 1.0f, 1.0f, 1.0f)
+//        }
 
         safeListener<TickEvent.ClientTickEvent> {
             if (mc.isIntegratedServerRunning) {

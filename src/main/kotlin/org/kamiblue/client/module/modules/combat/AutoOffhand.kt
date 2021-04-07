@@ -24,7 +24,6 @@ import org.kamiblue.client.util.items.*
 import org.kamiblue.client.util.text.MessageSendHelper
 import org.kamiblue.client.util.threads.safeListener
 import org.kamiblue.commons.extension.next
-import org.lwjgl.input.Keyboard
 import kotlin.math.ceil
 import kotlin.math.max
 
@@ -37,7 +36,6 @@ internal object AutoOffhand : Module(
 
     // Totem
     private val hpThreshold by setting("Hp Threshold", 5f, 1f..20f, 0.5f, { type == Type.TOTEM })
-    private val bindTotem by setting("Bind Totem", Bind(), { type == Type.TOTEM })
     private val checkDamage by setting("Check Damage", true, { type == Type.TOTEM })
     private val mob by setting("Mob", true, { type == Type.TOTEM && checkDamage })
     private val player by setting("Player", true, { type == Type.TOTEM && checkDamage })
@@ -46,20 +44,17 @@ internal object AutoOffhand : Module(
 
     // Gapple
     private val offhandGapple by setting("Offhand Gapple", false, { type == Type.GAPPLE })
-    private val bindGapple by setting("Bind Gapple", Bind(), { type == Type.GAPPLE && offhandGapple })
     private val checkAuraG by setting("Check Aura G", true, { type == Type.GAPPLE && offhandGapple })
     private val checkWeaponG by setting("Check Weapon G", false, { type == Type.GAPPLE && offhandGapple })
     private val checkCAGapple by setting("Check CrystalAura G", true, { type == Type.GAPPLE && offhandGapple && !offhandCrystal })
 
     // Strength
     private val offhandStrength by setting("Offhand Strength", false, { type == Type.STRENGTH })
-    private val bindStrength by setting("Bind Strength", Bind(), { type == Type.STRENGTH && offhandStrength })
     private val checkAuraS by setting("Check Aura S", true, { type == Type.STRENGTH && offhandStrength })
     private val checkWeaponS by setting("Check Weapon S", false, { type == Type.STRENGTH && offhandStrength })
 
     // Crystal
     private val offhandCrystal by setting("Offhand Crystal", false, { type == Type.CRYSTAL })
-    private val bindCrystal by setting("Bind Crystal", Bind(), { type == Type.CRYSTAL && offhandCrystal })
     private val checkCACrystal by setting("Check Crystal Aura C", false, { type == Type.CRYSTAL && offhandCrystal })
 
     // General
@@ -88,16 +83,6 @@ internal object AutoOffhand : Module(
     private var maxDamage = 0f
 
     init {
-        safeListener<InputEvent.KeyInputEvent> {
-            val key = Keyboard.getEventKey()
-            when {
-                bindTotem.isDown(key) -> switchToType(Type.TOTEM)
-                bindGapple.isDown(key) -> switchToType(Type.GAPPLE)
-                bindStrength.isDown(key) -> switchToType(Type.STRENGTH)
-                bindCrystal.isDown(key) -> switchToType(Type.CRYSTAL)
-            }
-        }
-
         safeListener<PacketEvent.Receive> {
             if (it.packet !is SPacketConfirmTransaction || it.packet.windowId != 0 || !transactionLog.containsKey(it.packet.actionNumber)) return@safeListener
 

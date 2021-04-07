@@ -1,13 +1,14 @@
 package org.kamiblue.client.util
 
+import baritone.api.utils.Helper.mc
 import net.minecraft.entity.Entity
 import net.minecraft.util.math.AxisAlignedBB
 import net.minecraft.util.math.Vec3d
 import net.minecraft.world.World
 import net.minecraftforge.fml.common.gameevent.TickEvent
 import org.kamiblue.client.event.KamiEventBus
-import org.kamiblue.client.util.graphics.KamiTessellator
 import org.kamiblue.client.util.threads.safeListener
+import org.kamiblue.client.mixin.extension.renderPartialTicksPaused
 import java.util.*
 import kotlin.collections.ArrayDeque
 
@@ -91,7 +92,8 @@ class MotionTracker(targetIn: Entity?, private val trackLength: Int = 20) {
     fun calcPositionAhead(ticksAhead: Int, interpolation: Boolean = false): Vec3d? {
         return target?.let { target ->
             calcMovedVectorAhead(ticksAhead, interpolation)?.let {
-                val partialTicks = if (interpolation) KamiTessellator.pTicks() else 1f
+                val pticks = if (mc.isGamePaused) mc.renderPartialTicksPaused else mc.renderPartialTicks;
+                val partialTicks = if (interpolation) pticks else 1f
                 EntityUtils.getInterpolatedPos(target, partialTicks).add(it)
             }
         }
@@ -107,7 +109,11 @@ class MotionTracker(targetIn: Entity?, private val trackLength: Int = 20) {
     fun calcMovedVectorAhead(ticksAhead: Int, interpolation: Boolean = false): Vec3d? {
         return Wrapper.world?.let { world ->
             target?.let {
-                val partialTicks = if (interpolation) KamiTessellator.pTicks() else 1f
+                val pticks = if (mc.isGamePaused) mc.renderPartialTicksPaused else mc.renderPartialTicks;
+                val partialTicks = if (interpolation) pticks else 1f
+
+
+
                 val averageMotion = prevMotion.add(motion.subtract(prevMotion).scale(partialTicks.toDouble()))
                 var movedVec = Vec3d(0.0, 0.0, 0.0)
                 for (ticks in 0..ticksAhead) {

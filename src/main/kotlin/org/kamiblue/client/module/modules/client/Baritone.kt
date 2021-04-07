@@ -2,12 +2,9 @@ package org.kamiblue.client.module.modules.client
 
 import net.minecraft.util.math.BlockPos
 import org.kamiblue.client.event.events.BaritoneSettingsInitEvent
-import org.kamiblue.client.event.events.RenderRadarEvent
 import org.kamiblue.client.module.Category
 import org.kamiblue.client.module.Module
 import org.kamiblue.client.util.BaritoneUtils
-import org.kamiblue.client.util.color.ColorHolder
-import org.kamiblue.client.util.graphics.RenderUtils2D
 import org.kamiblue.client.util.math.Vec2d
 import org.kamiblue.client.util.threads.safeListener
 import org.kamiblue.event.listener.listener
@@ -23,7 +20,6 @@ internal object Baritone : Module(
     alwaysEnabled = true
 ) {
     private val showOnRadar by setting("Show Path on Radar", true, description = "Show the current path on radar.")
-    private val color by setting("Path Color", ColorHolder(32, 250, 32), visibility = { showOnRadar })
     private val allowBreak = setting("Allow Break", true)
     private val allowSprint = setting("Allow Sprint", true)
     private val allowPlace = setting("Allow Place", true)
@@ -47,24 +43,7 @@ internal object Baritone : Module(
             sync()
         }
 
-        safeListener<RenderRadarEvent> {
-            if (!showOnRadar || !BaritoneUtils.isPathing) return@safeListener
 
-            val path = BaritoneUtils.primary?.pathingBehavior?.path ?: return@safeListener
-
-            if (!path.isPresent) return@safeListener
-
-            val playerOffset = Vec2d(player.position.x.toDouble(), player.position.z.toDouble())
-
-            for (movement in path.get().movements()) {
-                val positionFrom = getPos(movement.src, playerOffset, it.scale)
-                val positionTo = getPos(movement.dest, playerOffset, it.scale)
-
-                if (positionFrom.length() < it.radius && positionTo.length() < it.radius) {
-                    RenderUtils2D.drawLine(it.vertexHelper, positionFrom, positionTo, color = color, lineWidth = 3f)
-                }
-            }
-        }
     }
 
     private fun getPos(blockPos: BlockPos, playerOffset: Vec2d, scale: Float): Vec2d {

@@ -11,7 +11,6 @@ import org.kamiblue.client.module.Category
 import org.kamiblue.client.module.Module
 import org.kamiblue.client.setting.settings.impl.primitive.BooleanSetting
 import org.kamiblue.client.util.BaritoneUtils
-import org.kamiblue.client.util.Bind
 import org.kamiblue.client.util.EntityUtils.isInOrAboveLiquid
 import org.kamiblue.client.util.text.MessageSendHelper
 import org.kamiblue.client.util.threads.runSafe
@@ -35,8 +34,7 @@ internal object Step : Module(
     private val entityStep by setting("Entities", true)
     private val height by setting("Height", 1.0f, 0.25f..2.0f, 0.25f)
     private val downSpeed by setting("Down Speed", 0.2f, 0.0f..1.0f, 0.05f)
-    private val bindUpStep by setting("Bind Up Step", Bind())
-    private val bindDownStep by setting("Bind Down Step", Bind())
+
 
     private const val defaultHeight = 0.6f
 
@@ -64,19 +62,7 @@ internal object Step : Module(
             BaritoneUtils.settings?.assumeStep?.value = it && upStep.value
         }
 
-        listener<InputEvent.KeyInputEvent> {
-            val key = Keyboard.getEventKey()
 
-            if (bindUpStep.isDown(key)) {
-                upStep.value = !upStep.value
-                MessageSendHelper.sendChatMessage(upStep.toggleMsg())
-            }
-
-            if (bindDownStep.isDown(key)) {
-                downStep.value = !downStep.value
-                MessageSendHelper.sendChatMessage(downStep.toggleMsg())
-            }
-        }
     }
 
     private fun BooleanSetting.toggleMsg() = "$chatName Turned ${this.name} ${if (this.value) "&aon" else "&coff"}&f!"

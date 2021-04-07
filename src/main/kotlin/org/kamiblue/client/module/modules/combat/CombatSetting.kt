@@ -14,7 +14,6 @@ import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Vec3d
 import net.minecraftforge.fml.common.gameevent.TickEvent
 import org.kamiblue.client.event.SafeClientEvent
-import org.kamiblue.client.event.events.RenderOverlayEvent
 import org.kamiblue.client.manager.managers.CombatManager
 import org.kamiblue.client.module.Category
 import org.kamiblue.client.module.Module
@@ -23,11 +22,9 @@ import org.kamiblue.client.process.PauseProcess
 import org.kamiblue.client.process.PauseProcess.pauseBaritone
 import org.kamiblue.client.process.PauseProcess.unpauseBaritone
 import org.kamiblue.client.util.*
-import org.kamiblue.client.util.color.ColorHolder
 import org.kamiblue.client.util.combat.CombatUtils
 import org.kamiblue.client.util.combat.CrystalUtils.calcCrystalDamage
 import org.kamiblue.client.util.combat.CrystalUtils.getPlacePos
-import org.kamiblue.client.util.graphics.*
 import org.kamiblue.client.util.math.RotationUtils.getRelativeRotation
 import org.kamiblue.client.util.math.Vec2d
 import org.kamiblue.client.util.math.VectorUtils.distanceTo
@@ -38,7 +35,6 @@ import org.kamiblue.client.util.threads.runSafeR
 import org.kamiblue.client.util.threads.safeListener
 import org.kamiblue.commons.extension.ceilToInt
 import org.kamiblue.event.listener.listener
-import org.lwjgl.opengl.GL11.*
 import java.util.*
 import kotlin.collections.ArrayList
 import kotlin.collections.HashSet
@@ -124,23 +120,6 @@ internal object CombatSetting : Module(
     override fun isActive() = KillAura.isActive() || BedAura.isActive() || CrystalAura.isActive() || Surround.isActive()
 
     init {
-        listener<RenderOverlayEvent> {
-            if (!renderPredictedPos.value) return@listener
-            CombatManager.target?.let {
-                val ticks = if (pingSync.value) (InfoCalculator.ping() / 25f).ceilToInt() else ticksAhead.value
-                val posCurrent = EntityUtils.getInterpolatedPos(it, KamiTessellator.pTicks())
-                val posAhead = CombatManager.motionTracker.calcPositionAhead(ticks, true) ?: return@listener
-                val posAheadEye = posAhead.add(0.0, it.eyeHeight.toDouble(), 0.0)
-                val posCurrentScreen = Vec2d(ProjectionUtils.toScaledScreenPos(posCurrent))
-                val posAheadScreen = Vec2d(ProjectionUtils.toScaledScreenPos(posAhead))
-                val posAheadEyeScreen = Vec2d(ProjectionUtils.toScaledScreenPos(posAheadEye))
-                val vertexHelper = VertexHelper(GlStateUtils.useVbo())
-                val vertices = arrayOf(posCurrentScreen, posAheadScreen, posAheadEyeScreen)
-                glDisable(GL_TEXTURE_2D)
-                RenderUtils2D.drawLineStrip(vertexHelper, vertices, 2f, ColorHolder(80, 255, 80))
-                glEnable(GL_TEXTURE_2D)
-            }
-        }
 
         safeListener<TickEvent.ClientTickEvent>(5000) {
             for ((function, future) in jobMap) {
@@ -170,7 +149,7 @@ internal object CombatSetting : Module(
     }
 
     private fun SafeClientEvent.updatePlacingList() {
-        if (CrystalAura.isDisabled && CrystalBasePlace.isDisabled && CrystalESP.isDisabled && player.ticksExisted % 4 != 0) return
+        if (CrystalAura.isDisabled && CrystalBasePlace.isDisabled && player.ticksExisted % 4 != 0) return
 
         val eyePos = player.getPositionEyes(1f) ?: Vec3d.ZERO
         val cacheList = ArrayList<Pair<BlockPos, CombatManager.CrystalDamage>>()
@@ -191,7 +170,7 @@ internal object CombatSetting : Module(
 
     /* Crystal damage calculation */
     private fun SafeClientEvent.updateCrystalList() {
-        if (CrystalAura.isDisabled && CrystalESP.isDisabled && (player.ticksExisted - 2) % 4 != 0) return
+        if (CrystalAura.isDisabled && (player.ticksExisted - 2) % 4 != 0) return
 
         val cacheList = ArrayList<Pair<EntityEnderCrystal, CombatManager.CrystalDamage>>()
         val eyePos = player.getPositionEyes(1f)
@@ -285,10 +264,6 @@ internal object CombatSetting : Module(
                 if (!mc.gameSettings.keyBindAttack.isKeyDown && !mc.gameSettings.keyBindUseItem.isKeyDown) {
                     return LinkedList()
                 }
-                val eyePos = player.getPositionEyes(KamiTessellator.pTicks())
-                val lookVec = player.lookVec.scale(range.value.toDouble())
-                val sightEndPos = eyePos.add(lookVec)
-                listIn.removeIf { it.entityBoundingBox.calculateIntercept(eyePos, sightEndPos) == null }
             }
 
             else -> {

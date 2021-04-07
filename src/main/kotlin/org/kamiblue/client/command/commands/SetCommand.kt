@@ -3,8 +3,6 @@ package org.kamiblue.client.command.commands
 import net.minecraft.util.text.TextFormatting
 import org.kamiblue.client.KamiMod
 import org.kamiblue.client.command.ClientCommand
-import org.kamiblue.client.gui.GuiManager
-import org.kamiblue.client.gui.hudgui.AbstractHudElement
 import org.kamiblue.client.module.AbstractModule
 import org.kamiblue.client.module.ModuleManager
 import org.kamiblue.client.setting.settings.AbstractSetting
@@ -31,51 +29,8 @@ object SetCommand : ClientCommand(
             }
     }
 
-    private val hudElementSettingMap: Map<AbstractHudElement, Map<String, AbstractSetting<*>>> by AsyncCachedValue(5L, TimeUnit.SECONDS) {
-        GuiManager.hudElements
-            .associateWith { hudElements ->
-                hudElements.settingList.associateBy {
-                    it.name.formatSetting()
-                }
-            }
-    }
 
     init {
-        hudElement("hud element") { hudElementArg ->
-            string("setting") { settingArg ->
-                literal("toggle") {
-                    execute {
-                        val hudElement = hudElementArg.value
-                        val settingName = settingArg.value
-                        val setting = getSetting(hudElement, settingName)
-
-                        toggleSetting(hudElement.name, settingName, setting)
-                    }
-                }
-
-                greedy("value") { valueArg ->
-                    execute("Set the value of a hud element's setting") {
-                        val hudElement = hudElementArg.value
-                        val settingName = settingArg.value
-                        val setting = getSetting(hudElement, settingName)
-
-                        setSetting(hudElement.name, settingName, setting, valueArg.value)
-                    }
-                }
-
-                execute("Show the value of a setting") {
-                    val hudElement = hudElementArg.value
-                    val settingName = settingArg.value
-                    val setting = getSetting(hudElement, settingName)
-
-                    printSetting(hudElement.name, settingName, setting)
-                }
-            }
-
-            execute("List settings for a hud element") {
-                listSetting(hudElementArg.value.name, hudElementArg.value.settingList)
-            }
-        }
 
         module("module") { moduleArg ->
             string("setting") { settingArg ->
@@ -124,8 +79,7 @@ object SetCommand : ClientCommand(
     private fun getSetting(module: AbstractModule, settingName: String) =
         moduleSettingMap[module]?.get(settingName.formatSetting())
 
-    private fun getSetting(module: AbstractHudElement, settingName: String) =
-        hudElementSettingMap[module]?.get(settingName.formatSetting())
+
 
     private fun toggleSetting(name: String, settingName: String, setting: AbstractSetting<*>?) {
         if (setting == null) {
@@ -160,7 +114,7 @@ object SetCommand : ClientCommand(
             setting.setValue(value)
             MessageSendHelper.sendChatMessage("Set ${formatValue(setting.name)} to ${formatValue(setting.value)}.")
         } catch (e: Exception) {
-            MessageSendHelper.sendChatMessage("Unable to set value! ${TextFormatting.RED format e.message.toString()}")
+            MessageSendHelper.sendChatMessage("Unable to set value! red: ${e.message.toString()}")
             KamiMod.LOG.info("Unable to set value!", e)
         }
     }
@@ -180,7 +134,7 @@ object SetCommand : ClientCommand(
     private fun listSetting(name: String, settingList: List<AbstractSetting<*>>) {
         MessageSendHelper.sendChatMessage("List of settings for ${formatValue(name)} ${formatValue(settingList.size)}")
         MessageSendHelper.sendRawChatMessage(settingList.joinToString("\n") {
-            "    ${it.name.formatSetting(false)} ${TextFormatting.GRAY format it.value}"
+            "    ${it.name.formatSetting(false)} ${it.value}"
         })
     }
 

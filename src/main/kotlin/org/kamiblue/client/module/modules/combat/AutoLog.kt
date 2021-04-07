@@ -11,7 +11,6 @@ import net.minecraft.init.SoundEvents
 import net.minecraft.util.text.TextComponentString
 import net.minecraftforge.fml.common.gameevent.TickEvent
 import org.kamiblue.client.event.SafeClientEvent
-import org.kamiblue.client.gui.mc.KamiGuiDisconnected
 import org.kamiblue.client.manager.managers.CombatManager
 import org.kamiblue.client.manager.managers.FriendManager
 import org.kamiblue.client.module.Category
@@ -107,8 +106,7 @@ internal object AutoLog : Module(
         connection.networkManager.closeChannel(TextComponentString(""))
         mc.loadWorld(null as WorldClient?)
 
-        mc.displayGuiScreen(KamiGuiDisconnected(reasonText, screen, disableMode == DisableMode.ALWAYS || (disableMode == DisableMode.NOT_PLAYER && reason != PLAYER), LocalTime.now()))
-    }
+       }
 
     private fun getScreen() = if (mc.isIntegratedServerRunning) {
         GuiMainMenu()

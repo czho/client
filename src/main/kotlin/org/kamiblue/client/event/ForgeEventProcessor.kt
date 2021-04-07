@@ -12,16 +12,9 @@ import net.minecraftforge.fml.common.network.FMLNetworkEvent
 import org.kamiblue.client.command.CommandManager
 import org.kamiblue.client.event.events.BaritoneCommandEvent
 import org.kamiblue.client.event.events.ConnectionEvent
-import org.kamiblue.client.event.events.RenderWorldEvent
 import org.kamiblue.client.event.events.ResolutionUpdateEvent
-import org.kamiblue.client.gui.GuiManager
-import org.kamiblue.client.gui.mc.KamiGuiChat
-import org.kamiblue.client.module.ModuleManager
 import org.kamiblue.client.util.Wrapper
-import org.kamiblue.client.util.graphics.KamiTessellator
-import org.kamiblue.client.util.graphics.ProjectionUtils
 import org.kamiblue.client.util.text.MessageDetection
-import org.lwjgl.input.Keyboard
 import java.util.*
 
 internal object ForgeEventProcessor {
@@ -46,41 +39,6 @@ internal object ForgeEventProcessor {
         }
 
         mc.profiler.endSection()
-    }
-
-    @SubscribeEvent
-    @Suppress("UNUSED_PARAMETER")
-    fun onWorldRender(event: RenderWorldLastEvent) {
-        ProjectionUtils.updateMatrix()
-        KamiTessellator.prepareGL()
-        KamiEventBus.post(RenderWorldEvent())
-        KamiTessellator.releaseGL()
-    }
-
-    @SubscribeEvent
-    fun onRenderPre(event: RenderGameOverlayEvent.Pre) {
-        KamiEventBus.post(event)
-    }
-
-    @SubscribeEvent
-    fun onRender(event: RenderGameOverlayEvent.Post) {
-        KamiEventBus.post(event)
-    }
-
-    @SubscribeEvent(priority = EventPriority.NORMAL, receiveCanceled = true)
-    fun onKeyInput(event: InputEvent.KeyInputEvent) {
-        if (!Keyboard.getEventKeyState()) return
-
-        if (!mc.gameSettings.keyBindSneak.isKeyDown) {
-            val prefix = CommandManager.prefix
-            val typedChar = Keyboard.getEventCharacter().toString()
-            if (prefix.length == 1 && typedChar.equals(CommandManager.prefix, true)) {
-                mc.displayGuiScreen(KamiGuiChat(CommandManager.prefix))
-            }
-        }
-
-        KamiEventBus.post(event)
-        ModuleManager.onBind(Keyboard.getEventKey())
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)

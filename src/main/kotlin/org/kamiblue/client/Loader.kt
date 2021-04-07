@@ -4,7 +4,6 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import org.kamiblue.client.command.CommandManager
-import org.kamiblue.client.gui.GuiManager
 import org.kamiblue.client.manager.ManagerLoader
 import org.kamiblue.client.module.ModuleManager
 import org.kamiblue.client.plugin.PluginManager
@@ -17,7 +16,6 @@ internal object LoaderWrapper {
         loaderList.add(ModuleManager)
         loaderList.add(CommandManager)
         loaderList.add(ManagerLoader)
-        loaderList.add(GuiManager)
         loaderList.add(PluginManager)
     }
 

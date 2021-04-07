@@ -5,12 +5,10 @@ import kotlinx.coroutines.launch
 import net.minecraftforge.fml.common.gameevent.TickEvent
 import org.kamiblue.client.KamiMod
 import org.kamiblue.client.event.events.ConnectionEvent
-import org.kamiblue.client.gui.AbstractKamiGui
 import org.kamiblue.client.module.AbstractModule
 import org.kamiblue.client.module.Category
 import org.kamiblue.client.setting.ConfigManager
 import org.kamiblue.client.setting.GenericConfig
-import org.kamiblue.client.setting.GuiConfig
 import org.kamiblue.client.setting.ModuleConfig
 import org.kamiblue.client.setting.configs.AbstractConfig
 import org.kamiblue.client.setting.configs.IConfig
@@ -54,7 +52,7 @@ internal object Configurations : AbstractModule(
 
     init {
         BackgroundScope.launchLooping("Config Auto Saving", 60000L) {
-            if (autoSaving && mc.currentScreen !is AbstractKamiGui<*, *> && timer.tick(savingInterval.toLong())) {
+            if (autoSaving && timer.tick(savingInterval.toLong())) {
                 if (savingFeedBack) MessageSendHelper.sendChatMessage("Auto saving settings...")
                 else KamiMod.LOG.info("Auto saving settings...")
                 ConfigUtils.saveAll()
@@ -74,7 +72,6 @@ internal object Configurations : AbstractModule(
             if (mc.isIntegratedServerRunning) return@safeListener
 
             if (serverPreset) {
-                ConfigType.GUI.setServerPreset(ip)
                 ConfigType.MODULES.setServerPreset(ip)
             }
         }
@@ -137,7 +134,6 @@ internal object Configurations : AbstractModule(
         override val config: AbstractConfig<out Any>,
         override val setting: StringSetting
     ) : DisplayEnum, IConfigType {
-        GUI("GUI", GuiConfig, guiPresetSetting),
         MODULES("Modules", ModuleConfig, modulePresetSetting);
 
         override val serverPresets get() = getJsons(config.filePath) { it.name.startsWith("server-") }

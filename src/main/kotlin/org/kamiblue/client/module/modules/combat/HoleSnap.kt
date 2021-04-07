@@ -8,7 +8,6 @@ import net.minecraftforge.client.event.InputUpdateEvent
 import org.kamiblue.client.event.SafeClientEvent
 import org.kamiblue.client.event.events.PacketEvent
 import org.kamiblue.client.event.events.PlayerMoveEvent
-import org.kamiblue.client.event.events.RenderWorldEvent
 import org.kamiblue.client.module.Category
 import org.kamiblue.client.module.Module
 import org.kamiblue.client.module.modules.movement.Strafe
@@ -19,11 +18,9 @@ import org.kamiblue.client.util.MovementUtils.resetMove
 import org.kamiblue.client.util.MovementUtils.speed
 import org.kamiblue.client.util.combat.SurroundUtils
 import org.kamiblue.client.util.combat.SurroundUtils.checkHole
-import org.kamiblue.client.util.graphics.KamiTessellator
 import org.kamiblue.client.util.math.RotationUtils
 import org.kamiblue.client.util.math.VectorUtils
 import org.kamiblue.client.util.math.VectorUtils.distanceTo
-import org.kamiblue.client.util.math.VectorUtils.toBlockPos
 import org.kamiblue.client.util.math.VectorUtils.toVec3d
 import org.kamiblue.client.util.threads.safeAsyncListener
 import org.kamiblue.client.util.threads.safeListener
@@ -51,26 +48,6 @@ internal object HoleSnap : Module(
             stuckTicks = 0
         }
 
-        safeListener<RenderWorldEvent>(1) {
-            holePos?.let {
-                if (player.flooredPosition == it) return@safeListener
-
-                val posFrom = EntityUtils.getInterpolatedPos(player, KamiTessellator.pTicks())
-                val posTo = it.toVec3d(0.5, 0.0, 0.5)
-                val buffer = KamiTessellator.buffer
-
-                glLineWidth(3.0f)
-                glDisable(GL_DEPTH_TEST)
-                KamiTessellator.begin(GL_LINES)
-
-                buffer.pos(posFrom.x, posFrom.y, posFrom.z).color(32, 255, 32, 255).endVertex()
-                buffer.pos(posTo.x, posTo.y, posTo.z).color(32, 255, 32, 255).endVertex()
-
-                KamiTessellator.render()
-                glLineWidth(1.0f)
-                glEnable(GL_DEPTH_TEST)
-            }
-        }
 
         listener<PacketEvent.Receive> {
             if (it.packet is SPacketPlayerPosLook) disable()

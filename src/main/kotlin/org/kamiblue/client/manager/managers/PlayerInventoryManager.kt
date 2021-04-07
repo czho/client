@@ -3,7 +3,6 @@ package org.kamiblue.client.manager.managers
 import net.minecraft.client.gui.inventory.GuiContainer
 import net.minecraft.inventory.ClickType
 import org.kamiblue.client.event.events.ConnectionEvent
-import org.kamiblue.client.event.events.RenderOverlayEvent
 import org.kamiblue.client.manager.Manager
 import org.kamiblue.client.mixin.extension.syncCurrentPlayItem
 import org.kamiblue.client.module.AbstractModule
@@ -23,22 +22,6 @@ object PlayerInventoryManager : Manager {
     private var currentTask: InventoryTask? = null
 
     init {
-        safeListener<RenderOverlayEvent>(0) {
-            if (!timer.tick((1000.0f / TpsCalculator.tickRate).toLong())) return@safeListener
-
-            if (!player.inventory.itemStack.isEmpty) {
-                if (mc.currentScreen is GuiContainer) timer.reset(250L) // Wait for 5 extra ticks if player is moving item
-                else removeHoldingItem()
-                return@safeListener
-            }
-
-            getTaskOrNext()?.nextInfo()?.let {
-                clickSlot(it.windowId, it.slot, it.mouseButton, it.type)
-                playerController.syncCurrentPlayItem()
-            }
-
-            if (actionQueue.isEmpty()) currentId = 0
-        }
 
         listener<ConnectionEvent.Disconnect> {
             actionQueue.clear()

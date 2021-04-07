@@ -1,6 +1,5 @@
 package org.kamiblue.client.setting.configs
 
-import org.kamiblue.client.plugin.api.PluginHudElement
 import org.kamiblue.client.KamiMod
 import org.kamiblue.client.plugin.api.IPluginClass
 import org.kamiblue.client.plugin.api.PluginModule
@@ -19,9 +18,7 @@ class PluginConfig(pluginName: String) : NameableConfig<IPluginClass>(
             is PluginModule -> {
                 getGroupOrPut("modules").getGroupOrPut(owner.name).addSetting(setting)
             }
-            is PluginHudElement -> {
-                getGroupOrPut("hud").getGroupOrPut(owner.name).addSetting(setting)
-            }
+
             else -> {
                 getGroupOrPut("misc").getGroupOrPut(owner.name).addSetting(setting)
             }
@@ -33,9 +30,7 @@ class PluginConfig(pluginName: String) : NameableConfig<IPluginClass>(
             is PluginModule -> {
                 getGroup("modules")?.getGroupOrPut(nameable.name)?.getSettings()
             }
-            is PluginHudElement -> {
-                getGroup("hud")?.getGroup(nameable.name)?.getSettings()
-            }
+
             else -> {
                 getGroup("misc")?.getGroup(nameable.name)?.getSettings()
             }

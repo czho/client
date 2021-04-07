@@ -3,8 +3,6 @@ package org.kamiblue.client.plugin.api
 import org.kamiblue.client.command.ClientCommand
 import org.kamiblue.client.command.CommandManager
 import org.kamiblue.client.event.KamiEventBus
-import org.kamiblue.client.gui.GuiManager
-import org.kamiblue.client.gui.hudgui.KamiHudGui
 import org.kamiblue.client.manager.Manager
 import org.kamiblue.client.module.ModuleManager
 import org.kamiblue.client.plugin.PluginInfo
@@ -66,7 +64,7 @@ open class Plugin : Nameable {
      *
      * @sample org.kamiblue.client.gui.hudgui.elements.client.ModuleList
      */
-    val hudElements = CloseableList<PluginHudElement>()
+
 
     /**
      * The list of [BackgroundJob] the plugin will add.
@@ -83,7 +81,6 @@ open class Plugin : Nameable {
         managers.close()
         commands.close()
         modules.close()
-        hudElements.close()
         bgJobs.close()
 
         ConfigManager.register(config)
@@ -91,7 +88,6 @@ open class Plugin : Nameable {
         managers.forEach(KamiEventBus::subscribe)
         commands.forEach(CommandManager::register)
         modules.forEach(ModuleManager::register)
-        hudElements.forEach(GuiManager::register)
         bgJobs.forEach(BackgroundScope::launchLooping)
 
         ConfigManager.load(config)
@@ -117,10 +113,7 @@ open class Plugin : Nameable {
             ModuleManager.unregister(it)
             ListenerManager.unregister(it)
         }
-        hudElements.forEach {
-            GuiManager.unregister(it)
-            ListenerManager.unregister(it)
-        }
+
         bgJobs.forEach(BackgroundScope::cancel)
     }
 

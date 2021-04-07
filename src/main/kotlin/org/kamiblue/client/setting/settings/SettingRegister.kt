@@ -3,13 +3,9 @@ package org.kamiblue.client.setting.settings
 import org.kamiblue.client.setting.settings.impl.number.DoubleSetting
 import org.kamiblue.client.setting.settings.impl.number.FloatSetting
 import org.kamiblue.client.setting.settings.impl.number.IntegerSetting
-import org.kamiblue.client.setting.settings.impl.other.BindSetting
-import org.kamiblue.client.setting.settings.impl.other.ColorSetting
 import org.kamiblue.client.setting.settings.impl.primitive.BooleanSetting
 import org.kamiblue.client.setting.settings.impl.primitive.EnumSetting
 import org.kamiblue.client.setting.settings.impl.primitive.StringSetting
-import org.kamiblue.client.util.Bind
-import org.kamiblue.client.util.color.ColorHolder
 import java.util.function.BooleanSupplier
 
 /**
@@ -55,22 +51,8 @@ interface SettingRegister<T : Any> {
         fineStep: Float = step,
     ) = setting(FloatSetting(name, value, range, step, visibility, consumer, description, fineStep))
 
-    /** Bind Setting */
-    fun T.setting(
-        name: String,
-        value: Bind,
-        visibility: () -> Boolean = { true },
-        description: String = ""
-    ) = setting(BindSetting(name, value, visibility, description))
 
-    /** Color Setting */
-    fun T.setting(
-        name: String,
-        value: ColorHolder,
-        hasAlpha: Boolean = true,
-        visibility: () -> Boolean = { true },
-        description: String = ""
-    ) = setting(ColorSetting(name, value, hasAlpha, visibility, description))
+
 
     /** Boolean Setting */
     fun T.setting(
