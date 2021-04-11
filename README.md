@@ -9,6 +9,7 @@ Please consider donating to help continue this project and get a unique cape in 
 
 Fork of kamiblue / highway tools that is ment to be used in running clients on the server side. This with some extra goodies can be used to automaticly mine highways or do baritone tasks without any user interactions, its a better way to bot.
 
+becuase of the nature of this, it will never be merged.
 
 ## Contributing
 
