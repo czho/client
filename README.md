@@ -6,6 +6,10 @@
 
 Please consider donating to help continue this project and get a unique cape in game.
 
+
+Fork of kamiblue / highway tools that is ment to be used in running clients on the server side. This with some extra goodies can be used to automaticly mine highways or do baritone tasks without any user interactions, its a better way to bot.
+
+
 ## Contributing
 
 Please go to [kamiblue.org/contributing](https://kamiblue.org/contributing) for building / contributing instructions.
@@ -19,7 +23,3 @@ Please go to [kamiblue.org/contributing](https://kamiblue.org/contributing) for 
 The [Minecraft Forge team](https://github.com/MinecraftForge) for [forge](https://files.minecraftforge.net/)
 
 All the [contributors](https://github.com/kami-blue/client/graphs/contributors), including the ones who will be remembered in comments and in our hearts. This has been a huge community effort and I couldn't have done it without them.
-
-## Star Chart
-
-[![Stargazers over time](https://starchart.cc/kami-blue/client.svg)](https://starchart.cc/kami-blue/client)
