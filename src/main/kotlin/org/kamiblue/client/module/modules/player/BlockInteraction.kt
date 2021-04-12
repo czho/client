@@ -4,7 +4,6 @@ import net.minecraft.item.ItemBlock
 import net.minecraft.item.ItemPickaxe
 import net.minecraft.util.math.RayTraceResult
 import org.kamiblue.client.mixin.client.MixinMinecraft
-import org.kamiblue.client.mixin.client.render.MixinEntityRenderer
 import org.kamiblue.client.mixin.client.world.MixinBlockLiquid
 import org.kamiblue.client.module.Category
 import org.kamiblue.client.module.Module
