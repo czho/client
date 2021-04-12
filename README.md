@@ -17,6 +17,10 @@ Please go to [kamiblue.org/contributing](https://kamiblue.org/contributing) for 
 
 ## Thank you
 
+[Avanatiker](https://github.com/Avanatiker) for his genious work on highwaytools, this would be no where near possible to do without his hard work and detication. [Highwaytools](https://github.com/Avanatiker/client) 
+
+[kami-blue contributors](https://github.com/kami-blue/client) for making the whole client that this is based off and spasificly liv for keeping the quality of commits high and putting hours and hours of their life into kamiblue.
+
 [zeroeightysix](https://github.com/zeroeightysix) for the original [KAMI](https://github.com/zeroeightysix/KAMI)
 
 [ronmamo](https://github.com/ronmamo/) for [Reflections](https://github.com/ronmamo/reflections)
