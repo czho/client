@@ -8,7 +8,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import net.minecraft.block.Block
 import net.minecraft.block.BlockLiquid
-import net.minecraft.block.BlockShulkerBox
 import net.minecraft.client.audio.PositionedSoundRecord
 import net.minecraft.enchantment.EnchantmentHelper
 import net.minecraft.init.Blocks
@@ -48,7 +47,6 @@ import org.kamiblue.client.process.PauseProcess
 import org.kamiblue.client.setting.settings.impl.collection.CollectionSetting
 import org.kamiblue.client.util.*
 import org.kamiblue.client.util.EntityUtils.flooredPosition
-import org.kamiblue.client.util.EntityUtils.getDroppedItem
 import org.kamiblue.client.util.EntityUtils.getDroppedItems
 import org.kamiblue.client.util.items.*
 import org.kamiblue.client.util.math.CoordinateConverter.asString
@@ -57,7 +55,6 @@ import org.kamiblue.client.util.math.RotationUtils.getRotationTo
 import org.kamiblue.client.util.math.VectorUtils
 import org.kamiblue.client.util.math.VectorUtils.distanceTo
 import org.kamiblue.client.util.math.VectorUtils.multiply
-import org.kamiblue.client.util.math.VectorUtils.toBlockPos
 import org.kamiblue.client.util.math.VectorUtils.toVec3dCenter
 import org.kamiblue.client.util.math.isInSight
 import org.kamiblue.client.util.text.MessageSendHelper
@@ -203,6 +200,8 @@ internal object HighwayTools : Module(
     private var startingDirection = Direction.NORTH
     private var currentBlockPos = BlockPos(0, -1, 0)
     private var startingBlockPos = BlockPos(0, -1, 0)
+    var targetBlockPos = BlockPos(0, -1, 0)
+    var distancePending = 0
     private val blueprint = LinkedHashMap<BlockPos, Block>()
 
     // State
@@ -810,7 +809,15 @@ internal object HighwayTools : Module(
             MovementState.RUNNING -> {
                 val nextPos = getNextPos()
 
-                if (player.flooredPosition.distanceTo(nextPos) < 2.0) {
+                if (currentBlockPos.distanceTo(targetBlockPos) < 2 ||
+                    (distancePending > 0 && currentBlockPos.distanceTo(startingDirection.directionVec.multiply(distancePending)) < 2)) {
+                    MessageSendHelper.sendChatMessage("$chatName Reached target destination")
+                    mc.soundHandler.playSound(PositionedSoundRecord.getRecord(SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f))
+                    disable()
+                    return
+                }
+
+                if (player.flooredPosition.distanceTo(nextPos) < 2) {
                     currentBlockPos = nextPos
                 }
 
@@ -869,6 +876,19 @@ internal object HighwayTools : Module(
                 refreshData()
             }
             containerTask.taskState != TaskState.DONE -> {
+                if (containerTask.stuckTicks > containerTask.taskState.stuckTimeout) {
+                    when (containerTask.taskState) {
+                        TaskState.PICKUP -> {
+                            player.inventorySlots.firstEmpty()?.let {
+                                updateSlot(it.slotNumber)
+                            }
+                            containerTask.updateState(TaskState.DONE)
+                        }
+                        else -> {
+                            // Nothing
+                        }
+                    }
+                }
                 doTask(containerTask, false)
             }
             else -> {
@@ -977,9 +997,9 @@ internal object HighwayTools : Module(
                 else -> {
                     if (debugMessages != DebugMessages.OFF) {
                         if (!anonymizeStats) {
-                            MessageSendHelper.sendChatMessage("$chatName Stuck while ${blockTask.taskState}@(${blockTask.blockPos.asString()}) for more then $timeout ticks (${blockTask.stuckTicks}), refreshing data.")
+                            MessageSendHelper.sendChatMessage("$chatName Stuck while ${blockTask.taskState}@(${blockTask.blockPos.asString()}) for more than $timeout ticks (${blockTask.stuckTicks}), refreshing data.")
                         } else {
-                            MessageSendHelper.sendChatMessage("$chatName Stuck while ${blockTask.taskState} for more then $timeout ticks (${blockTask.stuckTicks}), refreshing data.")
+                            MessageSendHelper.sendChatMessage("$chatName Stuck while ${blockTask.taskState} for more than $timeout ticks (${blockTask.stuckTicks}), refreshing data.")
                         }
                     }
 
@@ -987,10 +1007,10 @@ internal object HighwayTools : Module(
                         TaskState.PLACE -> {
                             if (dynamicDelay && extraPlaceDelay < 10) extraPlaceDelay += 1
 
-                            updateCurrentSlot()
+                            updateSlot()
                         }
                         TaskState.BREAK -> {
-                            updateCurrentSlot()
+                            updateSlot()
                         }
                         else -> {
                             // Nothing
@@ -1694,9 +1714,7 @@ internal object HighwayTools : Module(
             return false
         }
 
-        val slotFrom = getBestTool(blockTask)
-
-        return if (slotFrom != null) {
+        return getBestTool(blockTask)?.let { slotFrom ->
             slotFrom.toHotbarSlotOrNull()?.let {
                 swapToSlot(it)
             } ?: run {
@@ -1704,7 +1722,7 @@ internal object HighwayTools : Module(
                 moveToHotbar(slotFrom.slotNumber, slotTo)
             }
             true
-        } else {
+        } ?: run {
             false
         }
     }
@@ -1835,9 +1853,9 @@ internal object HighwayTools : Module(
         }
     }
 
-    private fun SafeClientEvent.updateCurrentSlot() {
-        clickSlot(0, player.inventory.currentItem + 36, 0, ClickType.PICKUP)
-//        connection.sendPacket(CPacketCloseWindow(0))
+    private fun SafeClientEvent.updateSlot(slot: Int = player.inventory.currentItem + 36) {
+        clickSlot(0, slot, 0, ClickType.PICKUP)
+        connection.sendPacket(CPacketCloseWindow(0))
         runBlocking {
             onMainThreadSafe { playerController.updateController() }
         }
@@ -1939,7 +1957,6 @@ internal object HighwayTools : Module(
     }
 
 
-
     class InventoryTask(
         val packet: CPacketClickWindow,
         var inventoryState: InventoryState
@@ -2025,6 +2042,10 @@ internal object HighwayTools : Module(
             shuffle = nextInt(0, 1000)
         }
 
+        fun prettyPrint(): String {
+            return "    ${block.localizedName}@(${blockPos.asString()}) State: $taskState Timings: (Threshold: ${taskState.stuckThreshold} Timeout: ${taskState.stuckTimeout}) Priority: ${taskState.ordinal} Stuck: $stuckTicks"
+        }
+
         private fun onUpdate() {
             stuckTicks = 0
             ranTicks = 0
@@ -2051,10 +2072,10 @@ internal object HighwayTools : Module(
         PLACED(1000, 1000),
         LIQUID_SOURCE(100, 100),
         LIQUID_FLOW(100, 100),
-        PICKUP(1000, 1000),
-        PENDING_RESTOCK(1000, 1000),
-        RESTOCK(1000, 1000),
-        OPEN_CONTAINER(1000, 1000),
+        PICKUP(500, 500),
+        PENDING_RESTOCK(500, 500),
+        RESTOCK(500, 500),
+        OPEN_CONTAINER(500, 500),
         BREAKING(100, 100),
         BREAK(20, 20),
         PLACE(20, 20),

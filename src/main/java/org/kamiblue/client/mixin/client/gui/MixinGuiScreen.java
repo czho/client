@@ -15,5 +15,4 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(GuiScreen.class)
 public class MixinGuiScreen {
 
-
 }
